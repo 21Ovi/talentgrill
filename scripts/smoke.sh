@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# End-to-end check of the free path: health, signup, hint, two answers, quick
-# feedback. Run against a local server with the agent in stub mode; never
+# End-to-end check: health, signup, hint, two answers, quick feedback, payment
+# and webhook rejection. Run against a local server with the agent in stub mode; never
 # against production (it creates a user).
 set -euo pipefail
 BASE="${1:-http://localhost:3000}"
@@ -23,4 +23,17 @@ done
 curl -sf -X POST "$BASE/api/sessions/$SID/quick-eval" | field quickFeedback.overall_estimate > /dev/null
 NEXT=$(curl -sf "$BASE/api/sessions/$SID" | field next)
 [ "$NEXT" = "upsell" ] || { echo "expected next=upsell, got $NEXT"; exit 1; }
+
+# Pay (Pine Labs in stub mode: the checkout "succeeds" immediately).
+PID=$(curl -sf -X POST "$BASE/api/payments/create" -H "$J" -d "{\"sessionId\":\"$SID\"}" | field paymentId)
+CODE=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/api/payments/return?pid=$PID")
+[ "$CODE" = "303" ] || { echo "expected payment return to redirect (303), got $CODE"; exit 1; }
+STATUS=$(curl -sf "$BASE/api/payments/verify?pid=$PID" | field status)
+[ "$STATUS" = "SUCCESS" ] || { echo "expected payment SUCCESS, got $STATUS"; exit 1; }
+PRO=$(curl -sf "$BASE/api/sessions/$SID" | field session.isPro)
+[ "$PRO" = "true" ] || { echo "expected session to be Pro after payment"; exit 1; }
+
+# Webhooks without a valid signature are rejected.
+CODE=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/api/webhooks/pinelabs" -H "$J" -d '{"event_type":"ORDER_PROCESSED"}')
+[ "$CODE" = "401" ] || { echo "expected unsigned webhook to get 401, got $CODE"; exit 1; }
 echo "smoke test passed (session $SID)"

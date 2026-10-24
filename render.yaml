@@ -43,6 +43,14 @@ services:
         sync: false
       - key: PINELABS_MODE
         value: live
+      - key: PINELABS_ENV
+        value: uat # switch to production once live keys are issued
+      - key: PINELABS_CLIENT_ID
+        sync: false
+      - key: PINELABS_CLIENT_SECRET
+        sync: false
+      - key: PINELABS_WEBHOOK_SECRET
+        sync: false
       - key: VOBIZ_ENABLED
         value: "false"
 

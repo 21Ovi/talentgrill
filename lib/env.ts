@@ -25,6 +25,12 @@ const schema = z.object({
   // ElevenLabs premade voice "Rachel"; swap for an Indian-English voice from the library.
   ELEVENLABS_VOICE_ID: z.string().min(1).default("21m00Tcm4TlvDq8ikWAM"),
   PINELABS_MODE: mode,
+  // uat until the Pine Labs team switches the merchant to production keys.
+  PINELABS_ENV: z.enum(["uat", "production"]).default("uat"),
+  PINELABS_CLIENT_ID: z.string().min(1).optional(),
+  PINELABS_CLIENT_SECRET: z.string().min(1).optional(),
+  // Base64 secret from Dashboard > Settings; webhooks are rejected without it.
+  PINELABS_WEBHOOK_SECRET: z.string().min(1).optional(),
   VOBIZ_ENABLED: flag,
 });
 
