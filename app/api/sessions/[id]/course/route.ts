@@ -97,5 +97,5 @@ async function buildCourse(req: Request, id: string): Promise<Response> {
     });
   }
   const after = await loadSession(id);
-  return json({ course: after?.course ?? { ...result.output, trainer: COURSE_TRAINER.name } });
+  return json({ course: after?.course ?? { ...result.output, trainer: COURSE_TRAINER.name, completed: [] } });
 }
