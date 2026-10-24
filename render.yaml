@@ -1,0 +1,50 @@
+# Render Blueprint: Dashboard > New > Blueprint > pick this repo.
+# Creates the web service and Postgres in Singapore (closest region to India).
+services:
+  - type: web
+    name: talentgrill
+    runtime: node
+    region: singapore
+    plan: 1c-2g
+    numInstances: 1 # in-memory rate limits and the TTS cache assume one instance
+    buildCommand: npm ci && npm run build
+    preDeployCommand: npm run db:migrate && npm run db:seed
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: talentgrill-db
+          property: connectionString
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: INTERNAL_PHONES
+        sync: false
+      - key: ADMIN_COOKIE_SECRET
+        generateValue: true
+      - key: AGENT_TOOL_SECRET
+        generateValue: true
+      - key: IP_HASH_SALT
+        generateValue: true
+      - key: PRO_PRICE_PAISE
+        value: "500"
+      - key: CERT_THRESHOLD
+        value: "70"
+      - key: ALLOW_STUBS
+        value: "false"
+      - key: AGENTICORG_MODE
+        value: live
+      - key: ELEVENLABS_MODE
+        value: live
+      - key: PINELABS_MODE
+        value: live
+      - key: VOBIZ_ENABLED
+        value: "false"
+
+databases:
+  - name: talentgrill-db
+    databaseName: talentgrill
+    user: talentgrill
+    region: singapore
+    plan: 0.1c-256mb
