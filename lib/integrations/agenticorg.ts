@@ -46,17 +46,22 @@ const RunResponse = z.object({
 // A held run still carries the agent's full reply. Hints and practice feedback
 // are advisory, so they use it and the hold stays in AgenticOrg's approval queue;
 // the certificate decision (full_eval) waits for a human.
-const ADVISORY_TASKS: ReadonlySet<AgentTask> = new Set(["hint", "quick_eval", "followup"]);
+const ADVISORY_TASKS: ReadonlySet<AgentTask> = new Set(["hint", "quick_eval", "followup", "course_plan"]);
 
 const liveClient: AgentClient = {
   mode: "live",
   async run({ task, input, previousError, signal }) {
     const e = env();
-    if (!e.AGENTICORG_API_KEY || !e.AGENTICORG_AGENT_ID) {
-      throw new Error("AGENTICORG_API_KEY / AGENTICORG_AGENT_ID are not set");
+    // CourseCreatorAgent writes practice courses; FresherCoachAgent does the rest.
+    const [agentId, agentVar] =
+      task === "course_plan"
+        ? [e.AGENTICORG_COURSE_AGENT_ID, "AGENTICORG_COURSE_AGENT_ID"]
+        : [e.AGENTICORG_AGENT_ID, "AGENTICORG_AGENT_ID"];
+    if (!e.AGENTICORG_API_KEY || !agentId) {
+      throw new Error(`AGENTICORG_API_KEY / ${agentVar} are not set`);
     }
     const envelope = { task, input, ...(previousError ? { previous_error: previousError } : {}) };
-    const res = await fetch(`${e.AGENTICORG_BASE_URL}/api/v1/agents/${e.AGENTICORG_AGENT_ID}/run`, {
+    const res = await fetch(`${e.AGENTICORG_BASE_URL}/api/v1/agents/${agentId}/run`, {
       method: "POST",
       headers: { authorization: `Bearer ${e.AGENTICORG_API_KEY}`, "content-type": "application/json" },
       body: JSON.stringify({ action: "process", inputs: { task: JSON.stringify(envelope) }, context: {} }),
@@ -147,6 +152,23 @@ const stubClient: AgentClient = {
             "Open each answer with a one-line summary of your approach before the details.",
             "Back up at least one claim with a specific example or number from your own experience.",
           ],
+        },
+      };
+    }
+    if (task === "course_plan") {
+      const lesson = (title: string) => ({
+        title,
+        why: "Your feedback pointed here, so it is the quickest win.",
+        teach: "Start with a one-line summary, then walk through the steps in order, and finish with what changed because of you.",
+        example: "In my final-year project I owned the backend. First I listed the APIs we needed, then built and tested them one by one.",
+        drill: "Explain one project you are proud of in under two minutes.",
+      });
+      return {
+        runId: null,
+        output: {
+          title: "Sharper answers in 15 minutes",
+          summary: "Three short lessons built from your feedback, each with a question to practise out loud.",
+          lessons: [lesson("Lead with the answer"), lesson("Tell it in order"), lesson("Prove it with a number")],
         },
       };
     }
