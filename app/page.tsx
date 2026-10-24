@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { LiveCounter } from "@/components/LiveCounter";
 import { SignupForm } from "@/components/SignupForm";
 import { Brand, Orb, SoundToggle } from "@/components/ui";
@@ -16,7 +17,12 @@ export default function Home() {
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pb-[max(2.5rem,env(safe-area-inset-bottom))] sm:px-8">
       <header className="flex h-16 items-center justify-between">
         <Brand />
-        <SoundToggle />
+        <div className="flex items-center gap-1">
+          <Link href="/login" className="px-3 py-2 text-[15px] font-semibold text-muted hover:text-ink">
+            Log in
+          </Link>
+          <SoundToggle />
+        </div>
       </header>
 
       <div className="grid flex-1 grid-cols-1 items-center gap-10 pt-4 pb-12 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:gap-20 lg:pt-10">
