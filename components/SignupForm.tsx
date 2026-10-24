@@ -1,9 +1,11 @@
 "use client";
 
-import { ArrowRight, Loader2 } from "lucide-react";
+import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
+import { Button, Notice, Sheet } from "@/components/ui";
 import { api, errorMessage } from "@/lib/clientApi";
+import { cue } from "@/lib/feedback";
 import { ROLES } from "@/lib/roles";
 
 /** Keeps the 10 local digits, accepting pasted +91 / 0 prefixes. */
@@ -28,7 +30,7 @@ export function SignupForm() {
     e.preventDefault();
     if (!role) return setError("Pick the role you're preparing for.");
     if (!/^[6-9]\d{9}$/.test(phone)) return setError("Enter a 10-digit Indian mobile number.");
-    if (!consent) return setError("Please accept the consent note to continue.");
+    if (!consent) return setError("Tick the consent note to continue.");
 
     setSubmitting(true);
     setError(null);
@@ -43,6 +45,7 @@ export function SignupForm() {
         ref: params.get("ref") ?? undefined,
         src: params.get("src") ?? undefined,
       });
+      cue("success");
       router.push(`/interview/${sessionId}`);
     } catch (err) {
       setError(errorMessage(err));
@@ -51,100 +54,118 @@ export function SignupForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-5 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-      <label className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium">Your name</span>
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          autoComplete="name"
-          required
-          maxLength={60}
-          placeholder="Priya Sharma"
-          className="h-12 rounded-xl border border-stone-300 px-3 text-base outline-none focus:border-stone-900"
-        />
-      </label>
-
-      <label className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium">Mobile number</span>
-        <div className="flex h-12 overflow-hidden rounded-xl border border-stone-300 focus-within:border-stone-900">
-          <span className="flex items-center border-r border-stone-200 bg-stone-50 px-3 text-base text-stone-500">+91</span>
-          <input
-            value={phone}
-            onChange={(e) => setPhone(localDigits(e.target.value))}
-            type="tel"
-            inputMode="numeric"
-            autoComplete="tel-national"
-            required
-            placeholder="98765 43210"
-            className="min-w-0 flex-1 px-3 text-base outline-none"
-          />
+    <Sheet>
+      <form onSubmit={onSubmit} className="flex flex-col gap-6" noValidate>
+        <div className="flex flex-col gap-1">
+          <h2 className="text-[22px] font-semibold tracking-[-0.02em]">Start your free interview</h2>
+          <p className="text-[15px] text-muted">Takes about five minutes. No password.</p>
         </div>
-      </label>
 
-      <fieldset className="flex flex-col gap-2">
-        <legend className="mb-1.5 text-sm font-medium">Role you&apos;re preparing for</legend>
-        <div className="flex flex-wrap gap-2">
-          {ROLES.map((r) => (
-            <button
-              key={r.id}
-              type="button"
-              onClick={() => setRole(r.id)}
-              aria-pressed={role === r.id}
-              className={`min-h-11 rounded-full border px-4 text-sm font-medium transition-colors ${
-                role === r.id
-                  ? "border-stone-900 bg-stone-900 text-white"
-                  : "border-stone-300 bg-white text-stone-800 hover:border-stone-500"
-              }`}
-            >
-              {r.label}
-            </button>
-          ))}
+        {/* Grouped fields, like a settings list: one surface, hairline between rows. */}
+        <div className="overflow-hidden rounded-2xl bg-sunken/60 ring-1 ring-line ring-inset">
+          <label className="flex h-14 items-center gap-3 px-4">
+            <span className="w-16 shrink-0 text-[15px] text-muted">Name</span>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoComplete="name"
+              required
+              maxLength={60}
+              placeholder="Priya Sharma"
+              className="h-full min-w-0 flex-1 bg-transparent text-[17px] outline-none placeholder:text-faint"
+            />
+          </label>
+          <div className="ml-4 h-px bg-line" />
+          <label className="flex h-14 items-center gap-3 px-4">
+            <span className="w-16 shrink-0 text-[15px] text-muted">Mobile</span>
+            <span className="text-[17px] text-muted">+91</span>
+            <input
+              value={phone}
+              onChange={(e) => setPhone(localDigits(e.target.value))}
+              type="tel"
+              inputMode="numeric"
+              autoComplete="tel-national"
+              required
+              placeholder="98765 43210"
+              className="h-full min-w-0 flex-1 bg-transparent text-[17px] tabular-nums outline-none placeholder:text-faint"
+            />
+          </label>
         </div>
-      </fieldset>
 
-      <div className="flex flex-col gap-3">
-        <label className="flex items-start gap-3 text-sm text-stone-700">
-          <input
-            type="checkbox"
-            checked={consent}
-            onChange={(e) => setConsent(e.target.checked)}
-            className="mt-0.5 size-5 shrink-0 accent-stone-900"
-          />
-          We store your answers to give you feedback. We never share your number.
-        </label>
-        <label className="flex items-start gap-3 text-sm text-stone-700">
-          <input
-            type="checkbox"
-            checked={isEventStaff}
-            onChange={(e) => setIsEventStaff(e.target.checked)}
-            className="mt-0.5 size-5 shrink-0 accent-stone-900"
-          />
-          I&apos;m event staff or a mentor
-        </label>
-      </div>
+        <fieldset className="flex flex-col gap-2.5">
+          <legend className="mb-2.5 text-[15px] font-semibold">Role you&apos;re preparing for</legend>
+          <div className="grid grid-cols-2 gap-2">
+            {ROLES.map((r) => {
+              const on = role === r.id;
+              return (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => {
+                    cue("toggle");
+                    setRole(r.id);
+                  }}
+                  aria-pressed={on}
+                  className={`flex min-h-[68px] flex-col items-start justify-center gap-0.5 rounded-2xl px-3.5 py-2.5 text-left ring-inset transition-[scale,background-color,box-shadow] duration-300 ease-out-soft active:scale-[0.97] ${
+                    on ? "bg-ink text-on-ink ring-0" : "bg-surface ring-1 ring-line hover:bg-sunken"
+                  }`}
+                >
+                  <span className="text-[15px] font-semibold leading-tight">{r.label}</span>
+                  <span className={`text-[13px] leading-tight ${on ? "opacity-70" : "text-muted"}`}>{r.domain}</span>
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
 
-      {error && (
-        <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </p>
-      )}
+        <div className="flex flex-col gap-3.5">
+          <Checkbox checked={consent} onChange={setConsent}>
+            We store your answers to give you feedback. We never share your number.
+          </Checkbox>
+          <Checkbox checked={isEventStaff} onChange={setIsEventStaff}>
+            I&apos;m event staff or a mentor
+          </Checkbox>
+        </div>
 
-      <button
-        type="submit"
-        disabled={submitting}
-        className="flex h-13 items-center justify-center gap-2 rounded-xl bg-orange-600 text-base font-semibold text-white transition-colors hover:bg-orange-700 disabled:opacity-70"
+        {error && <Notice key={error}>{error}</Notice>}
+
+        <Button type="submit" size="lg" loading={submitting} className="w-full">
+          {submitting ? "Starting your interview…" : "Start my free interview"}
+        </Button>
+      </form>
+    </Sheet>
+  );
+}
+
+function Checkbox({
+  checked,
+  onChange,
+  children,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  children: ReactNode;
+}) {
+  return (
+    <label className="flex cursor-pointer items-start gap-3 text-[15px] leading-snug text-muted">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => {
+          cue("toggle");
+          onChange(e.target.checked);
+        }}
+        className="peer sr-only"
+      />
+      <span
+        aria-hidden
+        className={`mt-px flex size-[22px] shrink-0 items-center justify-center rounded-full transition-[background-color,box-shadow,scale] duration-300 ease-spring peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ember peer-active:scale-90 ${
+          checked ? "bg-ink text-on-ink" : "ring-[1.5px] ring-faint ring-inset"
+        }`}
       >
-        {submitting ? (
-          <>
-            <Loader2 className="size-5 animate-spin" /> Starting your interview…
-          </>
-        ) : (
-          <>
-            Start my free interview <ArrowRight className="size-5" />
-          </>
-        )}
-      </button>
-    </form>
+        <Check className={`size-3.5 stroke-[3] transition-[opacity,scale] duration-300 ease-spring ${checked ? "scale-100 opacity-100" : "scale-50 opacity-0"}`} />
+      </span>
+      <span>{children}</span>
+    </label>
   );
 }

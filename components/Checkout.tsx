@@ -1,10 +1,12 @@
 "use client";
 
-import { CheckCircle2, Loader2, Lock, RotateCcw, XCircle } from "lucide-react";
+import { Check, Lock, RotateCcw, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Button, buttonClass, Notice, Orb, Sheet } from "@/components/ui";
 import { api, errorMessage } from "@/lib/clientApi";
+import { cue } from "@/lib/feedback";
 
 const UNLOCKS = [
   "3 more questions, including a tougher round",
@@ -31,38 +33,34 @@ export function CheckoutStart({ sessionId, pricePaise }: { sessionId: string; pr
   }
 
   return (
-    <section className="flex flex-col gap-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-      <h1 className="text-2xl font-semibold tracking-tight">Unlock the full mock for ₹{rupees}</h1>
-      <ul className="flex flex-col gap-2 text-stone-700">
+    <Sheet className="arrive flex flex-col gap-6">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-[26px] font-semibold tracking-[-0.02em]">Unlock the full mock</h1>
+        <p className="text-[17px] text-muted">One payment of ₹{rupees}. No subscription.</p>
+      </div>
+      <ul className="flex flex-col gap-3">
         {UNLOCKS.map((item) => (
-          <li key={item} className="flex gap-2">
-            <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" />
+          <li key={item} className="flex gap-3 text-[16px] leading-snug">
+            <Check className="mt-0.5 size-4 shrink-0 stroke-[2.5] text-ok" />
             {item}
           </li>
         ))}
       </ul>
-      <p className="text-xs text-stone-500">
+      {error && <Notice key={error}>{error}</Notice>}
+      <div className="flex flex-col gap-3">
+        <Button size="lg" onClick={pay} loading={paying} className="w-full">
+          {!paying && <Lock className="size-[18px]" />}
+          {paying ? "Opening secure checkout…" : `Pay ₹${rupees} securely`}
+        </Button>
+        <p className="text-center text-sm text-muted">Payments by Pine Labs. UPI, cards and netbanking.</p>
+      </div>
+      <p className="text-sm text-faint">
         A human reviews your interview before any certificate is issued. Review does not guarantee certification.
       </p>
-      {error && (
-        <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </p>
-      )}
-      <button
-        type="button"
-        onClick={pay}
-        disabled={paying}
-        className="flex h-13 items-center justify-center gap-2 rounded-xl bg-orange-600 font-semibold text-white hover:bg-orange-700 disabled:opacity-70"
-      >
-        {paying ? <Loader2 className="size-5 animate-spin" /> : <Lock className="size-5" />}
-        {paying ? "Opening secure checkout…" : `Pay ₹${rupees} securely`}
-      </button>
-      <p className="text-center text-xs text-stone-500">Payments by Pine Labs · UPI, cards and netbanking</p>
-      <Link href={`/interview/${sessionId}`} className="text-center text-sm font-medium text-stone-600 underline">
+      <Link href={`/interview/${sessionId}`} className={buttonClass("quiet", "sm", "self-center")}>
         Back to my feedback
       </Link>
-    </section>
+    </Sheet>
   );
 }
 
@@ -110,9 +108,9 @@ export function CheckoutReturn({ paymentId }: { paymentId: string | null }) {
 
   if (result?.status === "SUCCESS") {
     return (
-      <Panel icon={<CheckCircle2 className="size-8 text-emerald-600" />} title="Payment confirmed">
-        <p className="text-stone-600">Taking you to your next question…</p>
-        <Link href={`/interview/${result.sessionId}`} className="flex h-12 items-center justify-center rounded-xl bg-stone-900 font-semibold text-white">
+      <Panel icon={<Badge tone="ok"><Check className="size-7 stroke-[2.5]" /></Badge>} title="Payment confirmed" cue="success">
+        <p className="text-[17px] text-muted">Taking you to your next question…</p>
+        <Link href={`/interview/${result.sessionId}`} className={buttonClass("primary", "lg", "w-full")}>
           Continue my interview
         </Link>
       </Panel>
@@ -121,36 +119,48 @@ export function CheckoutReturn({ paymentId }: { paymentId: string | null }) {
   if (result?.status === "FAILED" || gaveUp) {
     return (
       <Panel
-        icon={<XCircle className="size-8 text-red-600" />}
+        icon={<Badge tone="danger"><X className="size-7 stroke-[2.5]" /></Badge>}
         title={gaveUp ? "Still waiting for the bank" : "Payment didn't go through"}
+        cue="error"
       >
-        <p className="text-stone-600">
+        <p className="text-[17px] text-muted">
           {gaveUp
             ? "If money left your account, it will show up here within a few minutes. Otherwise, try again."
             : "No money was taken. You can try again with UPI, a card or netbanking."}
         </p>
         {sessionId && (
-          <Link href={`/checkout/${sessionId}`} className="flex h-12 items-center justify-center gap-2 rounded-xl bg-orange-600 font-semibold text-white">
-            <RotateCcw className="size-5" /> Try again
+          <Link href={`/checkout/${sessionId}`} className={buttonClass("primary", "lg", "w-full")}>
+            <RotateCcw className="size-[18px]" /> Try again
           </Link>
         )}
       </Panel>
     );
   }
   return (
-    <Panel icon={<Loader2 className="size-8 animate-spin text-orange-600" />} title="Confirming your payment…">
-      <p className="text-stone-600">This usually takes a few seconds. Please don&apos;t close this page.</p>
-      {error && <p className="text-sm text-red-700">{error}</p>}
+    <Panel icon={<Orb state="thinking" className="size-16" />} title="Confirming your payment…">
+      <p className="text-[17px] text-muted">This usually takes a few seconds. Keep this page open.</p>
+      {error && <p className="text-[15px] text-danger">{error}</p>}
     </Panel>
   );
 }
 
-function Panel({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+function Panel({ icon, title, cue: arrivalCue, children }: { icon: ReactNode; title: string; cue?: "success" | "error"; children: ReactNode }) {
+  useEffect(() => {
+    if (arrivalCue) cue(arrivalCue);
+  }, [arrivalCue]);
   return (
-    <section className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+    <section className="arrive flex flex-col items-start gap-4">
       {icon}
-      <h1 className="text-xl font-semibold">{title}</h1>
+      <h1 className="font-serif text-[30px] leading-tight">{title}</h1>
       {children}
     </section>
+  );
+}
+
+function Badge({ tone, children }: { tone: "ok" | "danger"; children: ReactNode }) {
+  return (
+    <span className={`flex size-14 items-center justify-center rounded-full ${tone === "ok" ? "bg-ok/12 text-ok" : "bg-danger/12 text-danger"}`}>
+      {children}
+    </span>
   );
 }
