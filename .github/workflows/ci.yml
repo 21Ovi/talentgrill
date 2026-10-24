@@ -54,6 +54,8 @@ jobs:
         env:
           AGENTICORG_MODE: stub
           PINELABS_MODE: stub
+          # Payments are paused in production, but the flow stays tested.
+          PAYMENTS_ENABLED: "true"
           ALLOW_STUBS: "true"
         run: |
           npx next start -p 3000 &
