@@ -64,7 +64,7 @@ export async function POST(req: Request) {
       await pool().query<{ password_hash: string | null }>("select password_hash from users where phone = $1", [body.phone])
     ).rows;
     if (existing?.password_hash && !(await verifyPassword(body.password, existing.password_hash))) {
-      throw new HttpError(409, "This number already has an account. Log in with your password, or check the password.");
+      throw new HttpError(409, "This number already has an account. Log in instead (joined before passwords? Your temporary password is on the log-in page).");
     }
     const passwordHash = existing?.password_hash ?? (await hashPassword(body.password));
 

@@ -28,8 +28,8 @@ export async function POST(req: Request) {
       throw new HttpError(429, "Too many attempts for this number. Please wait a minute.");
     }
 
-    const [user] = await query<{ id: string; password_hash: string | null }>(
-      "select id, password_hash from users where phone = $1",
+    const [user] = await query<{ id: string; password_hash: string | null; password_must_change: boolean }>(
+      "select id, password_hash, password_must_change from users where phone = $1",
       [body.phone],
     );
     const ok = user?.password_hash ? await verifyPassword(body.password, user.password_hash) : false;
@@ -47,9 +47,11 @@ export async function POST(req: Request) {
       type: "user_logged_in",
       userId: user.id,
       sessionId: latest?.id,
-      payload: { ...requestMeta(req) },
+      payload: { temporary_password: user.password_must_change, ...requestMeta(req) },
     });
     if (!latest) throw new HttpError(404, "No interviews yet. Start one from the home page.");
+    // The temporary password only gets you to the "set your own" step.
+    if (user.password_must_change) return json({ mustChangePassword: true });
     return json({ sessionId: latest.id });
   });
 }
