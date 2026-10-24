@@ -11,7 +11,7 @@ services:
     preDeployCommand: npm run db:migrate && npm run db:seed
     startCommand: npm start
     healthCheckPath: /api/health
-    autoDeploy: true
+    autoDeployTrigger: checksPass # deploy main only after GitHub CI passes
     envVars:
       - key: DATABASE_URL
         fromDatabase:
