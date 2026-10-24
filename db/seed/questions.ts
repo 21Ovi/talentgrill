@@ -78,6 +78,26 @@ const ROLE_FIT: Record<RoleId, Descriptors> = {
     "Friendly but generic; little sense of the business goal.",
     "Empathetic and persuasive: listens first and keeps both the person and the business goal in view.",
   ),
+  "cloud-engineer": d(
+    "Treats the cloud as someone else's computer to click around in, with no thought for security, cost or what happens when something fails.",
+    "Knows the core services and gives sensible answers, but only thinks about least privilege, cost or designing for failure when prompted.",
+    "Weighs security, failure and cost together without being asked: least privilege by default, no single points of failure, logs before changes, and owns problems openly with the team.",
+  ),
+  "cybersecurity-analyst": d(
+    "Treats security as tools and buzzwords, and jumps to drastic actions without evidence, escalation or regard for ethics.",
+    "Knows the core concepts and sensible steps but doesn't consistently verify with logs, follow a process or think about business impact.",
+    "Thinks in evidence and risk: checks logs before acting, contains then escalates and documents, stays within legal and ethical limits, and explains clearly to non-technical people.",
+  ),
+  "data-engineer": d(
+    "Talks only about tool names or textbook definitions and never thinks about whether the data is correct or who uses it.",
+    "Understands pipelines and SQL and checks their own output, but rarely thinks about re-runs, monitoring or downstream users.",
+    "Treats data as a product: builds pipelines that are safe to re-run, validates data at each step, keeps the analysts and dashboards that depend on it in mind, and communicates clearly when something breaks.",
+  ),
+  "frontend-developer": d(
+    "Talks only about the code they write, with no thought for real users, devices or browsers.",
+    "Gives correct technical answers but rarely considers users on slow phones, other browsers, keyboards or screen readers.",
+    "Thinks from the user's screen outward: tests on real devices and browsers, measures before optimising, builds for accessibility and keeps the team informed.",
+  ),
 };
 
 const BANK: Record<RoleId, { free: [Spec, Spec]; pro: [Spec, Spec, Spec] }> = {
@@ -524,6 +544,469 @@ const BANK: Record<RoleId, { free: [Spec, Spec]; pro: [Spec, Spec, Spec] }> = {
           "Found the underlying need or concern",
           "The action taken and the outcome",
           "What they learned",
+        ],
+      },
+    ],
+  },
+  "cloud-engineer": {
+    free: [
+      {
+        kind: "domain",
+        text: "What is a VPC, and how is a public subnet different from a private subnet?",
+        domain_accuracy: d(
+          "Calls a VPC 'a server' or 'the cloud' and can't say what makes a subnet public.",
+          "Describes a VPC as an isolated network and says public subnets face the internet, but doesn't know it's the route table and internet gateway that make them public.",
+          "Explains a VPC as an isolated network with its own CIDR range, that a public subnet routes to an internet gateway while a private one goes out only through a NAT gateway, and where security groups fit.",
+        ),
+        problem_solving: d(
+          "Recites definitions with no reason why you would split subnets at all.",
+          "Gives a reason for the split, like keeping the database private, but doesn't tie it to a concrete layout.",
+          "Walks through a real layout, such as the load balancer in public subnets and app servers and database in private subnets across two availability zones, and explains why.",
+        ),
+        key_points: [
+          "A VPC (VNet in Azure) is a logically isolated private network in the cloud with its own IP range (CIDR block)",
+          "Subnets divide the VPC's range, and each one sits in a single availability zone",
+          "A public subnet's route table has a route to an internet gateway; a private subnet's does not",
+          "Private subnets reach the internet outbound only, through a NAT gateway",
+          "Typical layout: load balancer in public subnets, app servers and database in private subnets",
+          "Security groups then control which ports and sources can reach each instance",
+        ],
+      },
+      {
+        kind: "behavioral",
+        text: "Tell me about a college or personal project where you deployed something to the cloud. What did you set up, and what was one problem you had to fix?",
+        domain_accuracy: d(
+          "Stays vague, like 'I used AWS', without naming any service, setting or detail.",
+          "Names the services used, such as an EC2 instance or an S3 bucket, but is fuzzy on how they were configured or connected.",
+          "Describes the setup concretely: instance type and region, which ports the security group opened, how the app was kept running and reached, and where data or files were stored.",
+        ),
+        problem_solving: d(
+          "Says it just worked, or that a friend or tutorial fixed the problem for them.",
+          "Describes the problem and the fix but not how they found the cause.",
+          "Explains how they narrowed the problem down, such as checking logs, the security group or the port the app listened on, and what they would do differently now.",
+        ),
+        key_points: [
+          "Clear picture of what was deployed and why that cloud service was chosen",
+          "Concrete config: instance or service type, region, ports opened in the security group",
+          "How the app was kept running and reached, e.g. a process manager like systemd or PM2, a public IP or domain",
+          "One real problem, like the app not reachable on port 80, and the steps used to find the cause",
+          "Basic hygiene: no hardcoded keys, stopping unused resources to avoid charges",
+          "An honest reflection on what they'd change next time",
+        ],
+      },
+    ],
+    pro: [
+      {
+        kind: "situational",
+        text: "Users say your company's website, running on a single cloud server, has suddenly stopped loading. What do you do?",
+        domain_accuracy: d(
+          "Only says 'restart the server' or 'raise a ticket with the cloud provider'.",
+          "Checks that the instance is running and looks at logs, but misses layers like the security group, DNS or a full disk.",
+          "Checks layer by layer: instance status checks and CPU, memory and disk, whether the service is up and listening, security group and DNS, then the web server and app logs.",
+        ),
+        problem_solving: d(
+          "Changes things at random or restarts without first finding out what broke.",
+          "Has a reasonable list of checks but no order, and no thought for users while debugging.",
+          "Confirms scope and recent changes first, works outside-in to isolate the failing layer, restores service fast, keeps people updated, then fixes the root cause with alerts and redundancy.",
+        ),
+        key_points: [
+          "Confirm the problem: is it down for everyone, and what changed recently (a deploy, config or certificate)",
+          "Check the instance: console status checks, CPU and memory, disk full (df -h, top)",
+          "Check the service: is the process running and listening on the right port (systemctl status, ss -tlnp)",
+          "Check the network path: security group rules, DNS, load balancer health checks if any",
+          "Read the web server and app logs to find the actual error",
+          "Restore first, then fix the root cause and add monitoring, alerts and a second instance",
+        ],
+      },
+      {
+        kind: "domain",
+        text: "How is vertical scaling different from horizontal scaling? Which would you choose to keep a shopping site running during a big festive sale?",
+        domain_accuracy: d(
+          "Mixes up the two terms, or thinks scaling just means buying a bigger plan.",
+          "Correctly says scaling up is a bigger machine and scaling out is more machines, but doesn't link it to availability or how traffic is spread.",
+          "Explains that vertical scaling has a ceiling and stays a single point of failure, while horizontal scaling uses a load balancer and auto scaling group across availability zones, and that the app must be stateless.",
+        ),
+        problem_solving: d(
+          "Picks one option with no reason given.",
+          "Picks horizontal scaling but doesn't consider what has to change in the app or what it costs.",
+          "Weighs the trade-off: scale out with auto scaling, move sessions to a shared store, plan for the database bottleneck, scale up before the sale, and scale back down afterwards to control cost.",
+        ),
+        key_points: [
+          "Vertical scaling: a bigger instance; simple, but has a hardware limit and often needs a restart",
+          "Horizontal scaling: more instances behind a load balancer, so one failure doesn't take the site down",
+          "Auto scaling groups add or remove instances based on CPU or request metrics",
+          "Spread instances across multiple availability zones for high availability",
+          "App must be stateless: sessions in Redis or a database, uploaded files in object storage",
+          "The database is often the bottleneck, and scaling down after the sale saves cost",
+        ],
+      },
+      {
+        kind: "situational",
+        text: "In your first month on the job, you realise you accidentally pushed the team's cloud access keys to a public GitHub repo. What do you do?",
+        domain_accuracy: d(
+          "Thinks deleting the file or making the repo private is enough.",
+          "Knows to deactivate or rotate the keys but doesn't check what they were already used for.",
+          "Revokes and rotates the keys at once, checks activity logs like CloudTrail and billing for unknown resources, removes the secret from git history, and moves to IAM roles or a secrets manager with least privilege.",
+        ),
+        problem_solving: d(
+          "Hides the mistake or hopes nobody notices.",
+          "Fixes the keys and tells the team, but treats it as a one-off with nothing to stop it happening again.",
+          "Tells the lead right away, acts in the right order (revoke, investigate, clean up), and suggests guardrails like secret scanning and pre-commit hooks.",
+        ),
+        key_points: [
+          "Assume the keys are already compromised: bots scan public GitHub repos within minutes",
+          "Deactivate and rotate the keys immediately, before anything else",
+          "Tell the lead or security team right away; owning the mistake early matters",
+          "Check activity logs (e.g. CloudTrail) and billing for unknown instances or data access",
+          "Remove the secret from git history; deleting it in a new commit is not enough",
+          "Prevent repeats: IAM roles instead of long-lived keys, least privilege, a secrets manager, secret scanning",
+        ],
+      },
+    ],
+  },
+  "cybersecurity-analyst": {
+    free: [
+      {
+        kind: "domain",
+        text: "Can you explain the CIA triad in security, with a simple example of an attack on each part?",
+        domain_accuracy: d(
+          "Confuses CIA with the intelligence agency or can't name confidentiality, integrity and availability.",
+          "Defines confidentiality, integrity and availability correctly but gives vague or mismatched examples.",
+          "Defines all three clearly, matches each to a real attack like a data leak, tampered records or a DDoS, and names a control for each such as encryption, hashing or backups.",
+        ),
+        problem_solving: d(
+          "Recites a memorized definition with no examples.",
+          "Gives examples but doesn't connect them to how you would protect against them.",
+          "Uses one everyday system, such as a college results portal, to show all three, and notes they can trade off, like strict access control hurting availability.",
+        ),
+        key_points: [
+          "Confidentiality: only authorized people can see the data (leaked database, shoulder surfing)",
+          "Integrity: data isn't changed without authorization (tampered marks, altered bank transfer)",
+          "Availability: systems are up when needed (DDoS, ransomware locking files)",
+          "Controls: encryption and access control, hashing and digital signatures, backups and redundancy",
+          "The three can conflict, e.g. tighter access control can slow or block legitimate users",
+        ],
+      },
+      {
+        kind: "behavioral",
+        text: "Tell me about a security project, lab or CTF challenge you worked on. What exactly did you do, and what did you learn?",
+        domain_accuracy: d(
+          "Describes the project only in buzzwords, like 'hacking' or 'used Kali', with no real technique named.",
+          "Names the tools and attack used, such as Nmap or SQL injection, but can't explain how they work underneath.",
+          "Explains the specific technique and why it worked, for example an unparameterized query or an open port running an outdated service, and how it would be fixed or detected.",
+        ),
+        problem_solving: d(
+          "Can't say what their own part was or what problem they were solving.",
+          "Walks through the steps they followed but not why they chose them or what went wrong.",
+          "Explains their approach, a point where they got stuck and how they got past it, and what they would do differently now.",
+        ),
+        key_points: [
+          "Clear goal: what system or challenge, and what they were trying to find or protect",
+          "Their own contribution, separate from the team's or a tutorial's",
+          "The specific technique or tool, e.g. an Nmap scan, Burp Suite, Wireshark, a SQL injection payload",
+          "Why it worked and how it would be fixed or detected",
+          "Worked only in a legal lab, CTF or with written permission",
+          "One concrete lesson they still use",
+        ],
+      },
+    ],
+    pro: [
+      {
+        kind: "situational",
+        text: "You're on a SOC shift and see hundreds of failed logins on one account, then a successful login from another country. What do you do?",
+        domain_accuracy: d(
+          "Calls it normal user error, or says 'block the whole country' without understanding the alert.",
+          "Recognizes a likely brute force or credential stuffing attack and suggests resetting the password.",
+          "Identifies brute force or credential stuffing followed by a likely account takeover, checks source IPs, impossible travel and MFA status, and contains by killing sessions, resetting credentials and checking what the attacker accessed.",
+        ),
+        problem_solving: d(
+          "Acts alone without checking logs, or ignores it hoping it's a false positive.",
+          "Takes sensible steps but in a random order, or skips escalation and documentation.",
+          "Follows a clear order: verify with logs and the user, contain, escalate per the playbook, investigate what was accessed, document, and suggest fixes like MFA and a lockout policy.",
+        ),
+        key_points: [
+          "The pattern points to brute force or credential stuffing, then a possible account takeover",
+          "Check logs: source IPs, timestamps, impossible travel, device, MFA prompts",
+          "Verify with the user through a separate channel, e.g. a phone call",
+          "Contain quickly: kill active sessions, disable or reset the account, block malicious IPs",
+          "Escalate per the playbook and look for what the attacker accessed or changed",
+          "Document the timeline and recommend MFA, account lockout and better alerting",
+        ],
+      },
+      {
+        kind: "domain",
+        text: "A website shows the padlock icon for HTTPS. What does that actually protect, and what can still go wrong?",
+        domain_accuracy: d(
+          "Says the padlock means the site is safe or can't be hacked.",
+          "Explains that TLS encrypts data in transit but can't name what it leaves unprotected.",
+          "Explains TLS encryption, integrity and certificate-based server identity, and says it doesn't stop phishing sites with valid certificates, SQL injection or XSS on the server, or a compromised device.",
+        ),
+        problem_solving: d(
+          "Gives a one-line answer with no reasoning about where attacks actually happen.",
+          "Lists a few gaps but doesn't tie them to where in the path the risk sits.",
+          "Walks the path from browser to network to server, shows what TLS covers at each step, and lands on why you still need input validation, patching and user awareness.",
+        ),
+        key_points: [
+          "TLS gives confidentiality and integrity in transit, so no sniffing or tampering on public Wi-Fi",
+          "The certificate proves the domain's identity, not that the owner is honest",
+          "Phishing sites can get free valid certificates, so the padlock doesn't mean trust",
+          "Server-side bugs like SQL injection and XSS still work over HTTPS",
+          "Data at rest on the server and an infected user device are not protected by TLS",
+          "Expired or mismatched certificates and old TLS versions are warning signs",
+        ],
+      },
+      {
+        kind: "situational",
+        text: "You closed an alert as a false positive, and two days later the team finds it was a real attack. How do you handle it?",
+        domain_accuracy: d(
+          "Has no idea how a missed alert affects the incident or what to do technically.",
+          "Says they would share what they saw but doesn't connect it to the investigation timeline.",
+          "Shares the original alert and their reasoning to help scope the incident and push the timeline back two days, checks for persistence and lateral movement, and suggests tuning the detection rule or triage checklist.",
+        ),
+        problem_solving: d(
+          "Hides the mistake, blames the tool or someone else, or panics.",
+          "Owns up but stops at an apology without a plan to prevent it happening again.",
+          "Owns it quickly, helps with the response first, then does a blameless review of why it looked benign and proposes a concrete fix like a second check for that alert type.",
+        ),
+        key_points: [
+          "Tell the lead immediately and own it; speed matters during an incident",
+          "Hand over the original alert, logs and reasoning to help scope the attack",
+          "The attacker may have had two extra days, so check for lateral movement and persistence",
+          "Help with the response before worrying about blame",
+          "Find why it looked benign: missing context, a weak runbook, alert fatigue",
+          "Propose a fix: rule tuning, alert enrichment, or peer review for that alert type",
+        ],
+      },
+    ],
+  },
+  "data-engineer": {
+    free: [
+      {
+        kind: "domain",
+        text: "What is an ETL pipeline, and how is ETL different from ELT?",
+        domain_accuracy: d(
+          "Cannot say what extract, transform and load mean, or treats ETL and ELT as the same thing.",
+          "Explains extract, transform and load correctly and says ELT transforms after loading, but cannot say why that matters.",
+          "Explains that ETL transforms data before loading it into the warehouse while ELT loads raw data first and transforms it inside a warehouse like BigQuery or Snowflake with SQL, and links the choice to warehouse compute, keeping raw data for reprocessing, and privacy needs.",
+        ),
+        problem_solving: d(
+          "Gives a textbook definition with no example and no reason to pick either approach.",
+          "Gives one example pipeline but picks an approach without explaining why.",
+          "Walks through a concrete example, like loading app orders into a warehouse, and reasons about when each fits: masking sensitive data before load, cheap warehouse compute, or needing to re-run transforms later.",
+        ),
+        key_points: [
+          "Extract from sources (app databases, APIs, files), transform (clean, join, aggregate), load into a target",
+          "ETL transforms before loading, often in a separate tool or Spark job",
+          "ELT loads raw data first and transforms inside the warehouse with SQL (e.g. dbt on BigQuery or Snowflake)",
+          "ELT keeps the raw data, so transforms can be fixed and re-run later",
+          "ETL suits cases where sensitive data must be masked or filtered before it lands",
+          "Choice depends on warehouse compute cost, data volume and team skills",
+        ],
+      },
+      {
+        kind: "behavioral",
+        text: "Tell me about a project where you worked with messy data. How did you clean it, and how did you check the final data was correct?",
+        domain_accuracy: d(
+          "Describes no real cleaning steps beyond 'I removed the errors'.",
+          "Mentions common fixes like dropping nulls or removing duplicates but not how they checked the result.",
+          "Names specific issues such as nulls, duplicates, inconsistent date formats or bad joins, explains how each was handled, and describes validation checks like row counts, unique keys and value range checks.",
+        ),
+        problem_solving: d(
+          "Gives a vague story with no clear problem, actions or outcome.",
+          "Explains what they did step by step but not why they chose those fixes.",
+          "Explains how they first profiled the data to find problems, made deliberate choices like fixing versus dropping rows, and verified the output against the source or expected totals.",
+        ),
+        key_points: [
+          "Clear context: the project, the data source and roughly how big it was",
+          "Specific problems found: nulls, duplicates, mixed date or currency formats, typos in categories",
+          "Profiling first, e.g. counting nulls and distinct values per column",
+          "Reasoned choices about when to drop, fill or flag bad rows",
+          "Validation: row counts before and after, unique keys, value ranges, spot-checks against the source",
+          "What they learned or would automate next time",
+        ],
+      },
+    ],
+    pro: [
+      {
+        kind: "situational",
+        text: "Your nightly sales pipeline failed, and the business team's morning dashboard is still showing old numbers. What do you do?",
+        domain_accuracy: d(
+          "Re-runs the whole job blindly or says to wait for it to fix itself.",
+          "Checks the logs to find the failing step and re-runs it, but ignores partial loads or duplicate data.",
+          "Uses the scheduler and job logs to find the failed task, checks whether the cause is late source data, a schema change or resources, fixes it, and re-runs idempotently so a partial load does not create duplicates, then confirms row counts.",
+        ),
+        problem_solving: d(
+          "Panics or starts changing code without understanding why it failed.",
+          "Follows a sensible order of steps but forgets to tell the people using the dashboard.",
+          "First tells stakeholders the data is stale with an expected fix time, then diagnoses, fixes, backfills and validates, and finally adds alerts or retries so it is caught earlier next time.",
+        ),
+        key_points: [
+          "Tell the dashboard users the data is stale and give an expected fix time",
+          "Check the scheduler (e.g. Airflow) and logs to find which task failed and why",
+          "Common causes: late or missing source file, schema change, bad data, timeout or out of memory",
+          "Re-run safely: idempotent loads, overwrite that day's partition, avoid duplicate rows",
+          "Validate after the fix: row counts and totals compared with previous days",
+          "Prevent repeats: alerts, retries, data checks and a short incident note",
+        ],
+      },
+      {
+        kind: "domain",
+        text: "In college we learn to normalise databases, so why do data warehouses often use a denormalised star schema instead?",
+        domain_accuracy: d(
+          "Cannot explain normalisation or what a star schema is.",
+          "Describes fact and dimension tables correctly but only says a star schema is 'faster' without explaining why.",
+          "Explains that normalisation reduces redundancy and protects writes in transactional OLTP systems, while a star schema with a central fact table and denormalised dimension tables suits read-heavy OLAP queries with fewer joins, at the cost of some redundancy.",
+        ),
+        problem_solving: d(
+          "Says one approach is simply better in every case.",
+          "Notes there is a trade-off but gives no example table or query.",
+          "Uses a concrete example, like a sales fact table with date, product and store dimensions, to show how analysts' queries get simpler and faster, and names the costs such as extra storage and handling changing dimensions.",
+        ),
+        key_points: [
+          "Normalisation (up to 3NF) avoids duplication and update anomalies; ideal for OLTP apps with many small writes",
+          "Warehouses are read-heavy (OLAP): large aggregations over many rows",
+          "Star schema: a fact table of measures (sales amount, quantity) with keys to dimension tables (date, product, store)",
+          "Fewer joins make queries simpler for analysts and faster for the engine",
+          "Trade-offs: redundant data, more storage, handling slowly changing dimensions",
+          "Snowflake schema is a middle ground with partly normalised dimensions",
+        ],
+      },
+      {
+        kind: "situational",
+        text: "You changed a pipeline last week, and today you find it has been loading duplicate rows into a table other teams use. How do you handle it?",
+        domain_accuracy: d(
+          "Deletes rows by hand without knowing which ones are duplicates, or hides the issue.",
+          "Finds and removes the duplicates, for example with a query on the key, but does not fix the root cause in the pipeline.",
+          "Finds duplicates with GROUP BY or ROW_NUMBER over the business key, makes the load idempotent with a MERGE, upsert or partition overwrite, cleans and backfills the affected days, and adds a uniqueness check.",
+        ),
+        problem_solving: d(
+          "Blames someone else or quietly fixes it hoping nobody noticed.",
+          "Fixes the data but only tells the affected teams after they complain.",
+          "Owns the mistake quickly, tells affected teams which dates and reports were wrong, pauses or rolls back the change, corrects history, and suggests a test or review step so the same change cannot slip through again.",
+        ),
+        key_points: [
+          "Own it early and tell downstream teams which tables and dates are affected",
+          "Stop the damage: pause the pipeline or roll back the change",
+          "Find duplicates with GROUP BY on the business key or ROW_NUMBER() over it",
+          "Fix the root cause: make loads idempotent with MERGE/upsert or partition overwrite",
+          "Clean and backfill the affected period, then re-check counts and totals",
+          "Prevent repeats: uniqueness tests, code review, testing on sample data before release",
+        ],
+      },
+    ],
+  },
+  "frontend-developer": {
+    free: [
+      {
+        kind: "domain",
+        text: "What is the difference between state and props in React, and what happens when a component's state changes?",
+        domain_accuracy: d(
+          "Mixes up state and props or says a child can change the props it receives.",
+          "Says props come from the parent and state is the component's own data, but is vague on what a state change triggers.",
+          "Explains props as read-only inputs from the parent, state as data the component owns and updates with useState or setState, and that a state change re-renders that component and its children.",
+        ),
+        problem_solving: d(
+          "Recites a definition with no example.",
+          "Gives a simple example like a counter but does not say how to decide where data should live.",
+          "Uses a concrete example, such as a search box passing its text to a results list, to show when to lift state up to a shared parent and pass it down as props.",
+        ),
+        key_points: [
+          "Props are passed from parent to child and are read-only inside the child",
+          "State is data a component owns and changes with useState or setState",
+          "Updating state triggers a re-render of that component and its children",
+          "Data flows one way: down through props, back up through callback props",
+          "Lift state to the nearest common parent when two components need the same data",
+          "Never mutate state directly; set a new value so React notices the change",
+        ],
+      },
+      {
+        kind: "behavioral",
+        text: "Tell me about a website or web app you built in college or on your own. What was one tricky frontend problem you hit, and how did you solve it?",
+        domain_accuracy: d(
+          "Names a project but cannot say which technologies were used or how the page actually worked.",
+          "Describes the stack, such as React and CSS, and a real problem like a broken layout, but explains the fix only loosely.",
+          "Explains their own part and the stack clearly, and describes the problem and fix in real terms, such as a flexbox layout breaking on mobile fixed with media queries, or a stale-data bug fixed with the right useEffect dependencies.",
+        ),
+        problem_solving: d(
+          "Says it 'just started working' or that a friend fixed it.",
+          "Explains what they changed but not how they found the cause.",
+          "Walks through how they narrowed it down with browser DevTools, console logs or testing on a real phone, and says what they would do differently next time.",
+        ),
+        key_points: [
+          "A one-line summary of what the project did and who used it",
+          "Their own role and the stack: HTML, CSS, JavaScript, React or similar",
+          "One specific problem, such as a layout breaking on mobile or data not updating on screen",
+          "How they found the cause: DevTools elements panel, console, network tab",
+          "The fix and why it worked",
+          "What they learned or would do differently",
+        ],
+      },
+    ],
+    pro: [
+      {
+        kind: "situational",
+        text: "Users say your product listing page takes eight seconds to load on their phones, but it feels fast on your laptop. What do you do?",
+        domain_accuracy: d(
+          "Blames the users' phones or internet and suggests no real fix.",
+          "Names one cause like large images or a big JavaScript bundle, without saying how to confirm it.",
+          "Names likely causes such as uncompressed images, a large JavaScript bundle, render-blocking scripts or too many API calls, and fixes like compressing and lazy loading images, code splitting and caching.",
+        ),
+        problem_solving: d(
+          "Starts rewriting the page or switching frameworks without measuring anything.",
+          "Suggests running Lighthouse but does not reproduce the user's slow phone and network.",
+          "Reproduces the problem with DevTools network and CPU throttling or a real budget phone, measures with Lighthouse and the network tab, fixes the biggest cost first and re-measures.",
+        ),
+        key_points: [
+          "Reproduce it: DevTools mobile emulation with slow 3G and CPU throttling, or a real budget phone",
+          "Measure first with Lighthouse and the network tab: what is largest and what blocks rendering",
+          "Shrink images: compress, use WebP, serve the right size, lazy load images below the fold",
+          "Cut JavaScript: code splitting, remove unused libraries, defer non-critical scripts",
+          "Check API calls: fewer requests, pagination, caching",
+          "Re-measure after each fix and confirm with users",
+        ],
+      },
+      {
+        kind: "domain",
+        text: "A teammate made a div with a click handler act like a button, and it works fine with a mouse. Why could that be a problem, and what would you do instead?",
+        domain_accuracy: d(
+          "Sees no problem because it works with a mouse.",
+          "Says to use a real button element but cannot explain who is affected or why.",
+          "Explains that a div is not focusable, ignores Enter and Space, and is not announced as a button by screen readers, so a native button element is the fix, with role, tabindex and key handlers only as a last resort.",
+        ),
+        problem_solving: d(
+          "Suggests adding CSS so it looks more clickable.",
+          "Proposes the right fix but not how to check that it works.",
+          "Proposes the native button and checks it by tabbing through the page with only a keyboard, trying a screen reader, and running Lighthouse or axe.",
+        ),
+        key_points: [
+          "A div cannot be reached with the Tab key and ignores Enter and Space",
+          "Screen readers do not announce a div as a button, so blind users may miss it",
+          "A native button element gives focus, keyboard support and the button role for free",
+          "If a div is unavoidable: role=button, tabindex=0 and handlers for Enter and Space",
+          "Keep a visible focus style; never remove the outline without a replacement",
+          "Test by tabbing through the page and with Lighthouse, axe or a screen reader",
+        ],
+      },
+      {
+        kind: "situational",
+        text: "You shipped a CSS change, and a user reports the login page layout is now broken on their iPhone, though it looks fine in your Chrome. How do you handle it?",
+        domain_accuracy: d(
+          "Cannot suggest why a page would look different in Safari than in Chrome.",
+          "Suspects a browser difference and checks another browser, but cannot name what might cause it.",
+          "Reproduces it in Safari or an iOS simulator with remote inspection, suspects causes like unsupported CSS, 100vh on mobile Safari or a fixed width, and fixes it with a fallback or responsive rule.",
+        ),
+        problem_solving: d(
+          "Says it works on their machine, or quietly pushes random fixes.",
+          "Fixes the bug but does not tell the team or do anything to prevent it next time.",
+          "Owns the mistake, tells the team, rolls back or hotfixes so users can log in, finds the root cause, and adds Safari and real-phone checks before future releases.",
+        ),
+        key_points: [
+          "Own it early: tell the lead or team, and roll back if users cannot log in",
+          "Get details from the user: device, iOS version, a screenshot",
+          "Reproduce in Safari, on an iPhone or a simulator, using remote inspection",
+          "Look for causes like unsupported CSS, 100vh on mobile Safari, fixed widths or missing prefixes",
+          "Fix with a fallback or responsive rule and retest across browsers",
+          "Prevent repeats: test on Safari and real phones, check caniuse before using new CSS",
         ],
       },
     ],
