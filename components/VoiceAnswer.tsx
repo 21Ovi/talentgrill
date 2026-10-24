@@ -1,8 +1,10 @@
 "use client";
 
-import { Loader2, Mic, RotateCcw, Square } from "lucide-react";
+import { Mic, RotateCcw, Square } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { Button, Notice, Orb, type OrbState } from "@/components/ui";
 import { api, errorMessage } from "@/lib/clientApi";
+import { cue } from "@/lib/feedback";
 import { computeSignals } from "@/lib/signals";
 
 const MAX_MS = 3 * 60_000;
@@ -24,6 +26,8 @@ export function useCanRecord(): boolean {
 
 type Phase = { name: "idle" } | { name: "recording"; startedAt: number } | { name: "transcribing" };
 
+const ORB_STATE: Record<Phase["name"], OrbState> = { idle: "idle", recording: "listening", transcribing: "thinking" };
+
 export function VoiceAnswer({
   sessionId,
   questionId,
@@ -40,10 +44,12 @@ export function VoiceAnswer({
   const [phase, setPhase] = useState<Phase>({ name: "idle" });
   const [now, setNow] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const recorder = useRef<MediaRecorder | null>(null);
   // Kept after a failed upload so a flaky connection doesn't cost the answer.
   const [failed, setFailed] = useState<{ audio: Blob; durationMs: number } | null>(null);
+  const recorder = useRef<MediaRecorder | null>(null);
   const discard = useRef(false);
+  const orb = useRef<HTMLSpanElement>(null);
+  const meter = useRef<{ ac: AudioContext; raf: number } | null>(null);
 
   useEffect(() => {
     if (phase.name !== "recording") return;
@@ -60,8 +66,41 @@ export function VoiceAnswer({
     return () => {
       discard.current = true;
       if (recorder.current?.state === "recording") recorder.current.stop();
+      stopMeter();
     };
   }, []);
+
+  /** Drives the orb's --level from the mic, outside React's render loop. */
+  function startMeter(stream: MediaStream) {
+    try {
+      const ac = new AudioContext();
+      const analyser = ac.createAnalyser();
+      analyser.fftSize = 512;
+      ac.createMediaStreamSource(stream).connect(analyser);
+      const buf = new Float32Array(analyser.fftSize);
+      let level = 0;
+      const frame = () => {
+        analyser.getFloatTimeDomainData(buf);
+        let sum = 0;
+        for (const v of buf) sum += v * v;
+        const target = Math.min(1, Math.sqrt(sum / buf.length) * 7);
+        level += (target - level) * (target > level ? 0.45 : 0.1); // quick attack, slow release
+        orb.current?.style.setProperty("--level", level.toFixed(3));
+        if (meter.current) meter.current.raf = requestAnimationFrame(frame);
+      };
+      meter.current = { ac, raf: requestAnimationFrame(frame) };
+    } catch {
+      // The level meter is decoration; recording works without it.
+    }
+  }
+
+  function stopMeter() {
+    if (!meter.current) return;
+    cancelAnimationFrame(meter.current.raf);
+    void meter.current.ac.close();
+    meter.current = null;
+    orb.current?.style.setProperty("--level", "0");
+  }
 
   async function upload(audio: Blob, durationMs: number) {
     setPhase({ name: "transcribing" });
@@ -73,6 +112,7 @@ export function VoiceAnswer({
     try {
       const res = await api<{ voiceTakeId: string; transcript: string }>(`/api/sessions/${sessionId}/transcribe`, form);
       setFailed(null);
+      cue("notify");
       onTake({ id: res.voiceTakeId, transcript: res.transcript, durationMs });
     } catch (err) {
       setFailed({ audio, durationMs });
@@ -99,90 +139,85 @@ export function VoiceAnswer({
       if (e.data.size > 0) chunks.push(e.data);
     };
     rec.onstop = () => {
+      stopMeter();
       stream.getTracks().forEach((t) => t.stop());
       recorder.current = null;
       if (discard.current) return;
+      cue("stop");
       void upload(new Blob(chunks, { type: rec.mimeType }), Date.now() - startedAt);
     };
     rec.start(1000);
     recorder.current = rec;
+    cue("start");
+    startMeter(stream);
     setNow(startedAt);
     setPhase({ name: "recording", startedAt });
   }
 
   if (take) {
     const s = computeSignals(take.transcript, "voice", take.durationMs);
+    const stats = [
+      `${s.word_count} words`,
+      `${s.filler_count} filler${s.filler_count === 1 ? "" : "s"}`,
+      ...(s.words_per_minute ? [`${s.words_per_minute} words/min`] : []),
+    ];
     return (
-      <div className="flex flex-col gap-2">
-        <p className="text-sm font-medium">Your answer, as we heard it</p>
-        <p className="rounded-2xl border border-stone-300 bg-white p-4 text-base leading-relaxed">{take.transcript}</p>
-        <div className="flex items-center justify-between gap-3 text-xs text-stone-500">
-          <span>
-            {s.word_count} words · {s.filler_count} filler{s.filler_count === 1 ? "" : "s"}
-            {s.words_per_minute ? ` · ${s.words_per_minute} words/min` : ""}
-          </span>
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => onTake(null)}
-            className="flex min-h-10 items-center gap-1.5 rounded-full border border-stone-300 px-3 font-medium text-stone-700 disabled:opacity-60"
-          >
+      <section className="arrive flex flex-col gap-4 rounded-[24px] bg-surface p-5 shadow-[var(--shadow-sheet)] ring-1 ring-line ring-inset">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-[15px] font-semibold">Your answer, as we heard it</h3>
+          <Button variant="quiet" size="sm" disabled={disabled} onClick={() => onTake(null)} className="-mr-2">
             <RotateCcw className="size-4" /> Record again
-          </button>
+          </Button>
         </div>
-      </div>
+        <p className="text-[17px] leading-relaxed">{take.transcript}</p>
+        <ul className="flex flex-wrap gap-2" aria-label="Delivery">
+          {stats.map((stat) => (
+            <li key={stat} className="rounded-full bg-sunken px-3 py-1 text-sm tabular-nums text-muted">
+              {stat}
+            </li>
+          ))}
+        </ul>
+      </section>
     );
   }
 
   const elapsed = phase.name === "recording" ? Math.max(0, now - phase.startedAt) : 0;
   const clock = `${Math.floor(elapsed / 60_000)}:${String(Math.floor((elapsed % 60_000) / 1000)).padStart(2, "0")}`;
+  const recording = phase.name === "recording";
 
   return (
-    <div className="flex flex-col items-center gap-3 rounded-2xl border border-stone-300 bg-white p-5">
-      {phase.name === "idle" && (
-        <>
-          <button
-            type="button"
-            onClick={start}
-            disabled={disabled}
-            aria-label="Start recording your answer"
-            className="flex size-20 items-center justify-center rounded-full bg-orange-600 text-white shadow-sm hover:bg-orange-700 disabled:opacity-60"
-          >
-            <Mic className="size-8" />
-          </button>
-          <p className="text-sm text-stone-600">Tap and answer out loud, like in the real interview.</p>
-        </>
-      )}
-      {phase.name === "recording" && (
-        <>
-          <button
-            type="button"
-            onClick={() => recorder.current?.stop()}
-            aria-label="Stop recording"
-            className="flex size-20 animate-pulse items-center justify-center rounded-full bg-red-600 text-white shadow-sm"
-          >
-            <Square className="size-7 fill-current" />
-          </button>
-          <p className="text-sm font-medium tabular-nums text-red-700">Recording {clock} · tap to finish</p>
-        </>
-      )}
-      {phase.name === "transcribing" && (
-        <>
-          <Loader2 className="size-8 animate-spin text-orange-600" />
-          <p className="text-sm text-stone-600">Listening back to your answer…</p>
-        </>
-      )}
+    <div className="flex flex-col items-center gap-5 py-4">
+      <button
+        type="button"
+        onClick={() => (recording ? recorder.current?.stop() : start())}
+        disabled={disabled || phase.name === "transcribing"}
+        aria-label={recording ? "Stop recording" : "Start recording your answer"}
+        className="rounded-full transition-[scale] duration-300 ease-spring active:scale-[0.94] disabled:opacity-100"
+      >
+        <Orb ref={orb} state={ORB_STATE[phase.name]} className="size-40">
+          {phase.name === "idle" && <Mic className="size-9" strokeWidth={2.2} />}
+          {recording && <Square className="size-7 fill-current" />}
+        </Orb>
+      </button>
+
+      <div className="flex min-h-12 flex-col items-center gap-0.5 text-center" aria-live="polite">
+        {phase.name === "idle" && <p className="text-[17px] text-muted">Tap the orb and answer out loud</p>}
+        {recording && (
+          <>
+            <p className="text-[17px] font-semibold tabular-nums text-ember-text">{clock}</p>
+            <p className="text-[15px] text-muted">Tap again when you&apos;re done</p>
+          </>
+        )}
+        {phase.name === "transcribing" && <p className="text-[17px] text-muted">Listening back to your answer…</p>}
+      </div>
+
       {error && (
-        <div role="alert" className="flex w-full flex-col gap-2 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
-          <p>{error}</p>
+        <div className="flex w-full flex-col items-start gap-2">
+          <Notice key={error}>{error}</Notice>
           {failed && phase.name === "idle" && (
-            <button
-              type="button"
-              onClick={() => upload(failed.audio, failed.durationMs)}
-              className="self-start font-semibold underline"
-            >
-              Retry sending this recording
-            </button>
+            <Button variant="secondary" size="sm" onClick={() => upload(failed.audio, failed.durationMs)}>
+              <RotateCcw className="size-4" /> Send this recording again
+            </Button>
           )}
         </div>
       )}

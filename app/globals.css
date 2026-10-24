@@ -1,15 +1,214 @@
 @import "tailwindcss";
 
+/* Dark mode follows the device setting. */
+@custom-variant dark (@media (prefers-color-scheme: dark));
+
 @theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
+  /* The interviewer's voice: questions, hints and feedback. */
+  --font-serif: var(--font-newsreader), ui-serif, Georgia, serif;
+
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-sunken: var(--sunken);
+  --color-ink: var(--ink);
+  --color-on-ink: var(--on-ink);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-line: var(--line);
+  --color-ember: var(--ember);
+  --color-ember-text: var(--ember-text);
+  --color-ok: var(--ok);
+  --color-danger: var(--danger);
+
+  /* iOS sheet curve, and a gentle spring with a small overshoot. */
+  --ease-out-soft: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-spring: linear(
+    0, 0.034 1.9%, 0.135 4%, 0.442 9.1%, 0.664 13%, 0.818 16.7%, 0.92 20.4%,
+    0.987 24.4%, 1.019 28.1%, 1.034 32.2%, 1.033 37.6%, 1.012 48.6%, 1.002 58.6%, 1
+  );
 }
 
 :root {
-  color-scheme: light;
+  color-scheme: light dark;
+  --canvas: #f5f5f3;
+  --surface: #ffffff;
+  --sunken: #ebebe8;
+  --ink: #1d1d1f;
+  --on-ink: #ffffff;
+  --muted: #6e6e73;
+  --faint: #a1a1a6;
+  --line: rgb(0 0 0 / 0.08);
+  --ember: #ff5a1f;
+  --ember-text: #c2410c;
+  --ok: #1e8e4e;
+  --danger: #d0342c;
+  --shadow-sheet: 0 1px 2px rgb(0 0 0 / 0.04), 0 12px 32px -16px rgb(0 0 0 / 0.16);
 }
 
-body {
-  background: var(--color-stone-50);
-  color: var(--color-stone-900);
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #000000;
+    --surface: #1c1c1e;
+    --sunken: #2c2c2e;
+    --ink: #f5f5f7;
+    --on-ink: #000000;
+    --muted: #98989d;
+    --faint: #636366;
+    --line: rgb(255 255 255 / 0.1);
+    --ember: #ff6a33;
+    --ember-text: #ff8a5c;
+    --ok: #34c77b;
+    --danger: #ff5a52;
+    --shadow-sheet: 0 0 0 1px rgb(255 255 255 / 0.04);
+  }
+}
+
+@layer base {
+  html {
+    background: var(--canvas);
+    color: var(--ink);
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    background: var(--canvas);
+    font-feature-settings: "ss01", "cv11";
+  }
+  :focus-visible {
+    outline: 2px solid var(--ember);
+    outline-offset: 3px;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--ember) 24%, transparent);
+  }
+  button,
+  [role="button"] {
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+  }
+}
+
+/* Content that arrives (a new question, feedback) settles in once. */
+@layer utilities {
+  .arrive {
+    transition:
+      opacity 520ms var(--ease-out-soft),
+      translate 640ms var(--ease-out-soft);
+    transition-delay: calc(var(--i, 0) * 70ms);
+    @starting-style {
+      opacity: 0;
+      translate: 0 10px;
+    }
+  }
+}
+
+/* The score ring fills once when feedback appears. */
+.ring-fill {
+  transition: stroke-dashoffset 1400ms var(--ease-out-soft) 250ms;
+  @starting-style {
+    stroke-dashoffset: var(--ring-c);
+  }
+}
+
+/* ---- The voice orb ------------------------------------------------------ */
+
+.orb {
+  --level: 0;
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 9999px;
+  isolation: isolate;
+  scale: calc(1 + var(--level) * 0.14);
+  transition: scale 110ms linear;
+}
+.orb > span {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.orb-glow {
+  background: var(--ember);
+  filter: blur(28px);
+  opacity: calc(0.22 + var(--level) * 0.5);
+  scale: 0.86;
+  z-index: -1;
+  transition: opacity 160ms linear;
+}
+/* Overlapping soft lights; rotating the disc makes them drift like liquid. */
+.orb-core {
+  background:
+    radial-gradient(circle at 28% 24%, #ffe0d0 0%, transparent 42%),
+    radial-gradient(circle at 74% 30%, #ff9b6a 0%, transparent 48%),
+    radial-gradient(circle at 70% 78%, #c8320a 0%, transparent 52%),
+    radial-gradient(circle at 24% 76%, #ff6b2c 0%, transparent 56%),
+    #ff5a1f;
+  animation: orb-spin 14s linear infinite;
+}
+.orb-sheen {
+  background:
+    radial-gradient(circle at 32% 26%, rgb(255 255 255 / 0.75), transparent 42%),
+    radial-gradient(circle at 70% 80%, rgb(120 30 0 / 0.25), transparent 50%);
+  mix-blend-mode: soft-light;
+}
+.orb[data-state="idle"] {
+  animation: orb-breathe 5.5s var(--ease-out-soft) infinite alternate;
+}
+.orb[data-state="listening"] .orb-core {
+  animation-duration: 4s;
+}
+.orb[data-state="thinking"] .orb-core {
+  animation-duration: 2.4s;
+}
+.orb[data-state="thinking"] {
+  animation: orb-breathe 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes orb-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+@keyframes orb-breathe {
+  from {
+    scale: 0.97;
+  }
+  to {
+    scale: 1.03;
+  }
+}
+
+/* Three bars that move while question audio plays. */
+.eq > i {
+  width: 3px;
+  border-radius: 2px;
+  background: currentColor;
+  animation: eq 900ms ease-in-out infinite alternate;
+}
+.eq > i:nth-child(2) {
+  animation-delay: -300ms;
+}
+.eq > i:nth-child(3) {
+  animation-delay: -600ms;
+}
+@keyframes eq {
+  from {
+    height: 4px;
+  }
+  to {
+    height: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+  }
 }

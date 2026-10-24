@@ -25,16 +25,18 @@ export function LiveCounter() {
   }, []);
 
   return (
-    <p className="flex h-5 items-center gap-2 text-sm text-stone-600" aria-live="polite">
+    <p className="flex h-6 items-center gap-2.5 text-[15px] text-muted" aria-live="polite">
       {count !== null && (
         <>
           <span className="relative flex size-2">
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-ok opacity-60" />
+            <span className="relative inline-flex size-2 rounded-full bg-ok" />
           </span>
-          {count > 0
-            ? `${count} interview${count === 1 ? "" : "s"} practised today`
-            : "Be the first to practise today"}
+          <span className="tabular-nums">
+            {count > 0
+              ? `${count} interview${count === 1 ? "" : "s"} practised today`
+              : "Be the first to practise today"}
+          </span>
         </>
       )}
     </p>
