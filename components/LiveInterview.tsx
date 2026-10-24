@@ -22,6 +22,8 @@ type Props = {
   questionCount: number;
   onDone: () => Promise<void>;
   onTypeInstead: () => void;
+  /** Shown on the ready screen, above the start button (the optional resume). */
+  beforeStart?: React.ReactNode;
 };
 
 /** A live two-way voice interview with Emma, the ElevenLabs interviewer agent. */
@@ -33,7 +35,7 @@ export function LiveInterview(props: Props) {
   );
 }
 
-function LiveCall({ sessionId, roleLabel, questionCount, onDone, onTypeInstead }: Props) {
+function LiveCall({ sessionId, roleLabel, questionCount, onDone, onTypeInstead, beforeStart }: Props) {
   const [phase, setPhase] = useState<Phase>("ready");
   const [error, setError] = useState<string | null>(null);
   const [questionNumber, setQuestionNumber] = useState<number | null>(null);
@@ -144,6 +146,7 @@ function LiveCall({ sessionId, roleLabel, questionCount, onDone, onTypeInstead }
           </p>
           <p className="text-[15px] text-faint">Find a quiet spot, use headphones if you can, and think out loud.</p>
         </div>
+        {beforeStart}
         {error && <Notice>{error}</Notice>}
         <div className="flex w-full flex-col gap-3">
           <Button size="lg" className="w-full" onClick={start} cue="start">

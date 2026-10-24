@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { wordCount } from "../signals";
 
-export type AgentTask = "hint" | "quick_eval" | "followup" | "full_eval" | "course_plan" | "company_prep";
+export type AgentTask = "hint" | "quick_eval" | "followup" | "full_eval" | "course_plan" | "company_prep" | "resume_read";
 
 export const HintOutput = z.object({
   hint: z
@@ -68,3 +68,20 @@ export const FullCoursePlanOutput = CoursePlanOutput.extend({
     .max(6),
   final_test: z.array(Quiz).min(3).max(8),
 });
+
+const short = (max: number) => z.string().trim().max(max);
+
+export const ResumeProfile = z.object({
+  headline: text(3, 200),
+  education: z.array(z.object({ degree: short(120), institution: short(160), year: short(20).catch("") })).max(5).catch([]),
+  skills: z.array(text(1, 60)).max(20).catch([]),
+  projects: z
+    .array(z.object({ name: text(1, 120), summary: short(400), tech: z.array(text(1, 40)).max(8).catch([]) }))
+    .max(6)
+    .catch([]),
+  experience: z.array(z.object({ role: short(120), organization: short(160), summary: short(400) })).max(6).catch([]),
+  achievements: z.array(text(1, 200)).max(6).catch([]),
+  talking_points: z.array(text(3, 300)).max(6).catch([]),
+  gaps: z.array(text(3, 300)).max(4).catch([]),
+});
+export type ResumeProfile = z.infer<typeof ResumeProfile>;

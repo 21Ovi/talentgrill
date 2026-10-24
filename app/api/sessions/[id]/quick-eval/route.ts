@@ -3,6 +3,7 @@ import { QuickEvalOutput } from "@/lib/agent/schemas";
 import { query } from "@/lib/db";
 import { logEvent } from "@/lib/events";
 import { handle, HttpError, json, isUuid, notFound } from "@/lib/http";
+import { RESUME_CONTEXT_NOTE, resumeBrief } from "@/lib/resume";
 import { loadSession } from "@/lib/session";
 import { computeSignals } from "@/lib/signals";
 
@@ -53,6 +54,7 @@ async function quickEval(id: string): Promise<Response> {
     schema: QuickEvalOutput,
     input: {
       role: s.roleLabel,
+      ...(s.resume ? { resume: resumeBrief(s.resume), resume_note: RESUME_CONTEXT_NOTE } : {}),
       answers: answers.map((a) => ({
         question: a.question_text,
         kind: a.kind,

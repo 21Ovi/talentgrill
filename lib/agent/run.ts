@@ -21,9 +21,11 @@ export async function runAgent<T>(opts: {
   sessionId: string;
   userId: string;
   input: Record<string, unknown>;
+  /** What to record in agent_runs instead of the input, e.g. without a resume's text. */
+  storedInput?: Record<string, unknown>;
   schema: z.ZodType<T>;
 }): Promise<AgentResult<T>> {
-  const { task, sessionId, userId, input, schema } = opts;
+  const { task, sessionId, userId, input, storedInput, schema } = opts;
   const started = Date.now();
 
   let client: AgentClient;
@@ -37,7 +39,7 @@ export async function runAgent<T>(opts: {
 
   const [run] = await query<{ id: string }>(
     "insert into agent_runs (session_id, task, mode, input) values ($1, $2, $3, $4) returning id",
-    [sessionId, task, client.mode, input],
+    [sessionId, task, client.mode, storedInput ?? input],
   );
   await logEvent({
     actor: "system",
