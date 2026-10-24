@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# End-to-end check: health, signup, hint, two answers, quick feedback, payment
+# End-to-end check: health, signup, hint, two answers, quick feedback, course, payment
 # and webhook rejection. Run against a local server with the agent in stub mode; never
 # against production (it creates a user).
 set -euo pipefail
@@ -21,6 +21,7 @@ for n in 1 2; do
 done
 
 curl -sf -X POST "$BASE/api/sessions/$SID/quick-eval" | field quickFeedback.overall_estimate > /dev/null
+curl -sf -X POST "$BASE/api/sessions/$SID/course" | field course.lessons.2.drill > /dev/null
 NEXT=$(curl -sf "$BASE/api/sessions/$SID" | field next)
 [ "$NEXT" = "upsell" ] || { echo "expected next=upsell, got $NEXT"; exit 1; }
 

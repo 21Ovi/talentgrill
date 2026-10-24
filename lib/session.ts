@@ -1,4 +1,5 @@
-import { QuickEvalOutput } from "./agent/schemas";
+import { CoursePlanOutput, QuickEvalOutput } from "./agent/schemas";
+import { coursesEnabled } from "./course";
 import { pool, type Queryable } from "./db";
 import { env } from "./env";
 import { FREE_QUESTIONS, PRO_QUESTIONS, ROLES, type RoleId } from "./roles";
@@ -19,6 +20,8 @@ export type SessionQuestion = {
 
 export type Next = "answer" | "quick_eval" | "upsell" | "full_eval";
 
+export type Course = CoursePlanOutput & { trainer: string };
+
 export type LoadedSession = {
   id: string;
   userId: string;
@@ -29,6 +32,8 @@ export type LoadedSession = {
   status: string;
   isPro: boolean;
   quickFeedback: QuickEvalOutput | null;
+  /** The practice course written from the quick feedback, once requested. */
+  course: Course | null;
   /** Free questions, plus pro questions once the session is Pro. */
   questions: SessionQuestion[];
   current: SessionQuestion | null;
@@ -70,6 +75,12 @@ export async function loadSession(id: string, db: Queryable = pool()): Promise<L
   const parsedFeedback = QuickEvalOutput.safeParse(s.quick_feedback);
   const quickFeedback = parsedFeedback.success ? parsedFeedback.data : null;
 
+  const [courseRow] = (
+    await db.query<{ trainer: string; plan: unknown }>("select trainer, plan from courses where session_id = $1", [id])
+  ).rows;
+  const parsedCourse = courseRow ? CoursePlanOutput.safeParse(courseRow.plan) : null;
+  const course = parsedCourse?.success ? { ...parsedCourse.data, trainer: courseRow.trainer } : null;
+
   const nextFree = questions.find((q) => q.tier === "free" && !q.answered) ?? null;
   const nextPro = questions.find((q) => q.tier === "pro" && !q.answered) ?? null;
   let current: SessionQuestion | null = null;
@@ -101,6 +112,7 @@ export async function loadSession(id: string, db: Queryable = pool()): Promise<L
     status: s.status,
     isPro: s.is_pro,
     quickFeedback,
+    course,
     questions,
     current,
     currentHints,
@@ -125,6 +137,8 @@ export function publicState(s: LoadedSession) {
     },
     next: s.next,
     quickFeedback: s.quickFeedback,
+    course: s.course,
+    coursesEnabled: coursesEnabled(),
     pricePaise: env().PRO_PRICE_PAISE,
     paymentsEnabled: env().PAYMENTS_ENABLED,
     liveInterview: env().LIVE_INTERVIEW_ENABLED,

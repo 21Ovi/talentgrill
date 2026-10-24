@@ -39,6 +39,8 @@ services:
         sync: false
       - key: AGENTICORG_AGENT_ID
         sync: false
+      - key: AGENTICORG_COURSE_AGENT_ID
+        sync: false
       - key: ELEVENLABS_MODE
         value: live
       - key: ELEVENLABS_API_KEY
