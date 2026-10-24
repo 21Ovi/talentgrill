@@ -7,7 +7,9 @@ export async function api<T>(url: string, body?: unknown): Promise<T> {
       url,
       body === undefined
         ? { cache: "no-store" }
-        : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) },
+        : body instanceof FormData
+          ? { method: "POST", body }
+          : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) },
     );
   } catch {
     throw new Error("Can't reach the server. Check your connection and try again.");

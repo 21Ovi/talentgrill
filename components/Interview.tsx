@@ -1,8 +1,9 @@
 "use client";
 
-import { CheckCircle2, Lightbulb, Loader2, Lock, RotateCcw, Send, Sparkles, Volume2 } from "lucide-react";
+import { CheckCircle2, Keyboard, Lightbulb, Loader2, Lock, Mic, RotateCcw, Send, Sparkles, Volume2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useCanRecord, VoiceAnswer, type VoiceTake } from "@/components/VoiceAnswer";
 import { api, errorMessage } from "@/lib/clientApi";
 import type { PublicState } from "@/lib/session";
 
@@ -96,8 +97,13 @@ function QuestionStep({
   const [hintError, setHintError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [preferVoice, setPreferVoice] = useState(true);
+  const [take, setTake] = useState<VoiceTake | null>(null);
   const shownAt = useRef<number | null>(null);
   const pasteEvent = useRef(false);
+  const audio = useRef<HTMLAudioElement | null>(null);
+  const canRecord = useCanRecord();
+  const voice = canRecord && preferVoice;
 
   useEffect(() => {
     shownAt.current = Date.now();
@@ -122,7 +128,7 @@ function QuestionStep({
     try {
       const { hint } = await api<{ hint: string }>(`/api/sessions/${sessionId}/hint`, {
         questionId: question.id,
-        partialTranscript: text,
+        partialTranscript: voice ? (take?.transcript ?? "") : text,
       });
       setHints((h) => [...h, hint]);
     } catch (err) {
@@ -136,13 +142,18 @@ function QuestionStep({
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await api(`/api/sessions/${sessionId}/answers`, {
-        questionId: question.id,
-        mode: "text",
-        transcript: text,
-        durationMs: shownAt.current ? Date.now() - shownAt.current : undefined,
-        pasteDetected: pasted,
-      });
+      await api(
+        `/api/sessions/${sessionId}/answers`,
+        voice && take
+          ? { questionId: question.id, mode: "voice", voiceTakeId: take.id }
+          : {
+              questionId: question.id,
+              mode: "text",
+              transcript: text,
+              durationMs: shownAt.current ? Date.now() - shownAt.current : undefined,
+              pasteDetected: pasted,
+            },
+      );
       await onSubmitted();
     } catch (err) {
       setSubmitError(errorMessage(err));
@@ -150,14 +161,33 @@ function QuestionStep({
     }
   }
 
+  // ElevenLabs reads the question; if that fails for any reason, the browser's voice does.
   function speak() {
-    if (!("speechSynthesis" in window)) return;
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(question.text);
-    u.lang = "en-IN";
-    u.rate = 0.95;
-    window.speechSynthesis.speak(u);
+    audio.current?.pause();
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    let fellBack = false;
+    const fallback = () => {
+      // A replaced or unmounted player also rejects; only the current one falls back.
+      if (fellBack || audio.current !== a || !("speechSynthesis" in window)) return;
+      fellBack = true;
+      const u = new SpeechSynthesisUtterance(question.text);
+      u.lang = "en-IN";
+      u.rate = 0.95;
+      window.speechSynthesis.speak(u);
+    };
+    const a = new Audio(`/api/sessions/${sessionId}/audio?q=${question.id}`);
+    a.onerror = fallback;
+    a.play().catch(fallback);
+    audio.current = a;
   }
+
+  useEffect(
+    () => () => {
+      audio.current?.pause();
+      audio.current = null;
+    },
+    [],
+  );
 
   return (
     <>
@@ -189,25 +219,49 @@ function QuestionStep({
         </div>
       ))}
 
-      <div className="flex flex-col gap-2">
-        <label htmlFor="answer" className="text-sm font-medium">
-          Your answer
-        </label>
-        <textarea
-          id="answer"
-          value={text}
-          onChange={(e) => onChange(e.target.value)}
-          onPaste={onPaste}
-          rows={7}
-          maxLength={6000}
-          placeholder="Answer the way you would say it in the interview…"
-          className="rounded-2xl border border-stone-300 bg-white p-4 text-base leading-relaxed outline-none focus:border-stone-900"
-        />
-        <div className="flex justify-between text-xs text-stone-500">
-          <span>{words > 0 && words < 40 ? "Aim for 60–150 words, like a real answer." : " "}</span>
-          <span>{words} words</span>
+      {canRecord && (
+        <div className="grid grid-cols-2 gap-1 rounded-xl bg-stone-200 p-1 text-sm font-semibold" role="group" aria-label="Answer by">
+          {[
+            { on: true, label: "Speak", Icon: Mic },
+            { on: false, label: "Type", Icon: Keyboard },
+          ].map(({ on, label, Icon }) => (
+            <button
+              key={label}
+              type="button"
+              aria-pressed={preferVoice === on}
+              disabled={submitting}
+              onClick={() => setPreferVoice(on)}
+              className={`flex min-h-10 items-center justify-center gap-1.5 rounded-lg ${preferVoice === on ? "bg-white shadow-sm" : "text-stone-600"}`}
+            >
+              <Icon className="size-4" /> {label}
+            </button>
+          ))}
         </div>
-      </div>
+      )}
+
+      {voice ? (
+        <VoiceAnswer sessionId={sessionId} questionId={question.id} take={take} onTake={setTake} disabled={submitting} />
+      ) : (
+        <div className="flex flex-col gap-2">
+          <label htmlFor="answer" className="text-sm font-medium">
+            Your answer
+          </label>
+          <textarea
+            id="answer"
+            value={text}
+            onChange={(e) => onChange(e.target.value)}
+            onPaste={onPaste}
+            rows={7}
+            maxLength={6000}
+            placeholder="Answer the way you would say it in the interview…"
+            className="rounded-2xl border border-stone-300 bg-white p-4 text-base leading-relaxed outline-none focus:border-stone-900"
+          />
+          <div className="flex justify-between text-xs text-stone-500">
+            <span>{words > 0 && words < 40 ? "Aim for 60–150 words, like a real answer." : " "}</span>
+            <span>{words} words</span>
+          </div>
+        </div>
+      )}
 
       {hintError && <InlineError message={hintError} />}
       {submitError && <InlineError message={submitError} />}
@@ -225,7 +279,7 @@ function QuestionStep({
         <button
           type="button"
           onClick={submit}
-          disabled={submitting || text.trim().length < 2}
+          disabled={submitting || (voice ? !take : text.trim().length < 2)}
           className="flex h-13 flex-[1.4] items-center justify-center gap-2 rounded-xl bg-stone-900 font-semibold text-white disabled:opacity-40"
         >
           {submitting ? <Loader2 className="size-5 animate-spin" /> : <Send className="size-5" />}
