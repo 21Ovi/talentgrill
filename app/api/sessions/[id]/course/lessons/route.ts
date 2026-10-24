@@ -5,7 +5,7 @@ import { handle, HttpError, isUuid, json, notFound, readJson } from "@/lib/http"
 import { clientIp, take } from "@/lib/rateLimit";
 import { loadSession } from "@/lib/session";
 
-const Body = z.object({ lesson: z.number().int().min(1).max(3) });
+const Body = z.object({ lesson: z.number().int().min(1).max(6) });
 
 // Marks one practice-course lesson as practised. Idempotent per lesson.
 export async function POST(req: Request, ctx: RouteContext<"/api/sessions/[id]/course/lessons">) {
@@ -20,6 +20,8 @@ export async function POST(req: Request, ctx: RouteContext<"/api/sessions/[id]/c
       }
       const s = await loadSession(id);
       if (!s?.course) throw new HttpError(404, "Course not found.");
+      const total = s.course.lessons.length;
+      if (lesson > total) throw new HttpError(400, "That lesson isn't in this course.");
       if (s.course.completed.includes(lesson)) return json({ completed: s.course.completed });
 
       const [row] = await query<{ completed_lessons: number[] }>(
@@ -35,9 +37,9 @@ export async function POST(req: Request, ctx: RouteContext<"/api/sessions/[id]/c
         type: "course_lesson_completed",
         userId: s.userId,
         sessionId: id,
-        payload: { lesson, title: s.course.lessons[lesson - 1]?.title, completed: completed.length, of: 3 },
+        payload: { lesson, title: s.course.lessons[lesson - 1]?.title, completed: completed.length, of: total },
       });
-      if (completed.length === 3) {
+      if (completed.length === total) {
         await logEvent({ actor: "user", type: "course_completed", userId: s.userId, sessionId: id, payload: { trainer: s.course.trainer } });
       }
       return json({ completed });

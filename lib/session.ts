@@ -20,7 +20,7 @@ export type SessionQuestion = {
 
 export type Next = "answer" | "quick_eval" | "upsell" | "full_eval";
 
-export type Course = CoursePlanOutput & { trainer: string; completed: number[] };
+export type Course = CoursePlanOutput & { trainer: string; completed: number[]; testScore: number | null };
 
 export type LoadedSession = {
   id: string;
@@ -76,14 +76,19 @@ export async function loadSession(id: string, db: Queryable = pool()): Promise<L
   const quickFeedback = parsedFeedback.success ? parsedFeedback.data : null;
 
   const [courseRow] = (
-    await db.query<{ trainer: string; plan: unknown; completed_lessons: number[] }>(
-      "select trainer, plan, completed_lessons from courses where session_id = $1",
+    await db.query<{ trainer: string; plan: unknown; completed_lessons: number[]; test_score: number | null }>(
+      "select trainer, plan, completed_lessons, test_score from courses where session_id = $1",
       [id],
     )
   ).rows;
   const parsedCourse = courseRow ? CoursePlanOutput.safeParse(courseRow.plan) : null;
   const course = parsedCourse?.success
-    ? { ...parsedCourse.data, trainer: courseRow.trainer, completed: courseRow.completed_lessons }
+    ? {
+        ...parsedCourse.data,
+        trainer: courseRow.trainer,
+        completed: courseRow.completed_lessons,
+        testScore: courseRow.test_score,
+      }
     : null;
 
   const nextFree = questions.find((q) => q.tier === "free" && !q.answered) ?? null;
@@ -142,7 +147,7 @@ export function publicState(s: LoadedSession) {
     },
     next: s.next,
     quickFeedback: s.quickFeedback,
-    course: s.course,
+    course: s.course && publicCourse(s.course),
     coursesEnabled: coursesEnabled(),
     pricePaise: env().PRO_PRICE_PAISE,
     paymentsEnabled: env().PAYMENTS_ENABLED,
@@ -150,6 +155,11 @@ export function publicState(s: LoadedSession) {
     /** Free questions still open: what a live call would cover. */
     liveQuestions: s.questions.filter((q) => q.tier === "free" && !q.answered).length,
   };
+}
+
+/** The final test's answers stay on the server until it is graded. */
+export function publicCourse(c: Course) {
+  return { ...c, final_test: c.final_test?.map(({ question, options }) => ({ question, options })) };
 }
 
 export type PublicState = ReturnType<typeof publicState>;
