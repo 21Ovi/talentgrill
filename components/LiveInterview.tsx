@@ -1,7 +1,7 @@
 "use client";
 
 import { ConversationProvider, useConversation } from "@elevenlabs/react";
-import { Keyboard, Lightbulb, Mic, PhoneOff, RotateCcw } from "lucide-react";
+import { Keyboard, Lightbulb, Mic, MicOff, PhoneOff, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Notice, Orb } from "@/components/ui";
 import { api, errorMessage } from "@/lib/clientApi";
@@ -102,7 +102,7 @@ function LiveCall({ sessionId, roleLabel, questionCount, onDone, onTypeInstead }
     let raf = 0;
     const frame = () => {
       const c = audio.current;
-      const level = c.isSpeaking ? c.getOutputVolume() : c.getInputVolume();
+      const level = c.isSpeaking ? c.getOutputVolume() : c.isMuted ? 0 : c.getInputVolume();
       el.style.setProperty("--level", Math.min(1, level * 1.8).toFixed(3));
       raf = requestAnimationFrame(frame);
     };
@@ -120,6 +120,7 @@ function LiveCall({ sessionId, roleLabel, questionCount, onDone, onTypeInstead }
       const res = await api<StartResponse>(`/api/sessions/${sessionId}/live/start`, {});
       call.current = { liveCallId: res.liveCallId, conversationId: null };
       finishing.current = false;
+      if (conversation.isMuted) conversation.setMuted(false);
       conversation.startSession({
         conversationToken: res.token,
         connectionType: "webrtc",
@@ -176,6 +177,7 @@ function LiveCall({ sessionId, roleLabel, questionCount, onDone, onTypeInstead }
     );
   }
 
+  const muted = conversation.isMuted;
   return (
     <section className="arrive flex flex-1 flex-col items-center gap-6 pb-10 pt-4 text-center">
       <span className="text-sm font-medium text-muted">
@@ -183,21 +185,33 @@ function LiveCall({ sessionId, roleLabel, questionCount, onDone, onTypeInstead }
       </span>
       <Orb ref={orb} state="listening" className="size-40" />
       <p className="text-[15px] font-medium text-ember-text" aria-live="polite">
-        {conversation.isSpeaking ? "Emma is speaking" : "Listening…"}
+        {conversation.isSpeaking ? "Emma is speaking" : muted ? "You're muted" : "Listening…"}
       </p>
       <p className="min-h-[4.5rem] max-w-md font-serif text-[19px] leading-relaxed">
         {caption ? (caption.role === "user" ? <span className="text-muted">“{caption.text}”</span> : caption.text) : " "}
       </p>
       <div className="mt-auto flex w-full flex-col gap-3">
-        <Button
-          variant="secondary"
-          size="lg"
-          className="w-full"
-          onClick={() => conversation.sendUserMessage("I'm stuck on this one. Could you give me a hint?")}
-        >
-          <Lightbulb className="size-[18px]" />
-          I&apos;m stuck
-        </Button>
+        <div className="grid grid-cols-2 gap-3">
+          <Button
+            variant={muted ? "primary" : "secondary"}
+            size="lg"
+            cue="toggle"
+            aria-pressed={muted}
+            aria-label={muted ? "Unmute your microphone" : "Mute your microphone"}
+            onClick={() => conversation.setMuted(!muted)}
+          >
+            {muted ? <MicOff className="size-[18px]" /> : <Mic className="size-[18px]" />}
+            {muted ? "Unmute" : "Mute"}
+          </Button>
+          <Button
+            variant="secondary"
+            size="lg"
+            onClick={() => conversation.sendUserMessage("I'm stuck on this one. Could you give me a hint?")}
+          >
+            <Lightbulb className="size-[18px]" />
+            I&apos;m stuck
+          </Button>
+        </div>
         <Button variant="quiet" className="w-full" cue="stop" onClick={() => conversation.endSession()}>
           <PhoneOff className="size-4" />
           End interview

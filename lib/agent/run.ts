@@ -46,6 +46,7 @@ export async function runAgent<T>(opts: {
   });
 
   let vendorRunId: string | null = null;
+  let vendor: { confidence?: number | null; held_for_approval?: string | null } = {};
   let error = "";
   let output: T | null = null;
   const signal = AbortSignal.timeout(TIMEOUT_MS);
@@ -53,6 +54,7 @@ export async function runAgent<T>(opts: {
     try {
       const res = await client.run({ task, input, previousError: error || undefined, signal });
       vendorRunId = res.runId ?? vendorRunId;
+      vendor = { confidence: res.confidence, held_for_approval: res.heldForApproval };
       const parsed = schema.safeParse(typeof res.output === "string" ? JSON.parse(res.output) : res.output);
       if (parsed.success) output = parsed.data;
       else error = parsed.error.issues.map((i) => `${i.path.join(".") || "output"}: ${i.message}`).join("; ");
@@ -74,7 +76,15 @@ export async function runAgent<T>(opts: {
     type: ok ? "agent_run_succeeded" : "agent_run_failed",
     userId,
     sessionId,
-    payload: { task, agent_run_id: run.id, agenticorg_run_id: vendorRunId, mode: client.mode, latency_ms: latency, ...(ok ? {} : { error }) },
+    payload: {
+      task,
+      agent_run_id: run.id,
+      agenticorg_run_id: vendorRunId,
+      mode: client.mode,
+      latency_ms: latency,
+      ...vendor,
+      ...(ok ? {} : { error }),
+    },
   });
 
   if (output !== null) {
