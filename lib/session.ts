@@ -1,5 +1,5 @@
 import { CoursePlanOutput, QuickEvalOutput } from "./agent/schemas";
-import { coursesEnabled } from "./course";
+import { coursesEnabled, PASS_PERCENT } from "./course";
 import { pool, type Queryable } from "./db";
 import { env } from "./env";
 import { FREE_QUESTIONS, PRO_QUESTIONS, ROLES, type RoleId } from "./roles";
@@ -20,6 +20,8 @@ export type SessionQuestion = {
 
 export type Next = "answer" | "quick_eval" | "upsell" | "full_eval";
 
+export type CompanyPrep = { company: string; plan: CoursePlanOutput };
+
 export type Course = CoursePlanOutput & { trainer: string; completed: number[]; testScore: number | null };
 
 export type LoadedSession = {
@@ -34,6 +36,8 @@ export type LoadedSession = {
   quickFeedback: QuickEvalOutput | null;
   /** The practice course written from the quick feedback, once requested. */
   course: Course | null;
+  /** Company-specific guides, unlocked at 80+ on the final test or the interview. */
+  companyPreps: CompanyPrep[];
   /** Free questions, plus pro questions once the session is Pro. */
   questions: SessionQuestion[];
   current: SessionQuestion | null;
@@ -81,6 +85,16 @@ export async function loadSession(id: string, db: Queryable = pool()): Promise<L
       [id],
     )
   ).rows;
+  const companyPreps = (
+    await db.query<{ company: string; plan: unknown }>(
+      "select company, plan from company_preps where session_id = $1 order by created_at",
+      [id],
+    )
+  ).rows.flatMap((r) => {
+    const plan = CoursePlanOutput.safeParse(r.plan);
+    return plan.success ? [{ company: r.company, plan: plan.data }] : [];
+  });
+
   const parsedCourse = courseRow ? CoursePlanOutput.safeParse(courseRow.plan) : null;
   const course = parsedCourse?.success
     ? {
@@ -123,6 +137,7 @@ export async function loadSession(id: string, db: Queryable = pool()): Promise<L
     isPro: s.is_pro,
     quickFeedback,
     course,
+    companyPreps,
     questions,
     current,
     currentHints,
@@ -149,12 +164,19 @@ export function publicState(s: LoadedSession) {
     quickFeedback: s.quickFeedback,
     course: s.course && publicCourse(s.course),
     coursesEnabled: coursesEnabled(),
+    companyPreps: s.companyPreps,
+    companyPrepUnlocked: companyPrepUnlocked(s),
     pricePaise: env().PRO_PRICE_PAISE,
     paymentsEnabled: env().PAYMENTS_ENABLED,
     liveInterview: env().LIVE_INTERVIEW_ENABLED,
     /** Free questions still open: what a live call would cover. */
     liveQuestions: s.questions.filter((q) => q.tier === "free" && !q.answered).length,
   };
+}
+
+/** Company prep opens at 80+ on the course's final test or the interview itself. */
+export function companyPrepUnlocked(s: LoadedSession): boolean {
+  return (s.course?.testScore ?? 0) >= PASS_PERCENT || (s.quickFeedback?.overall_estimate ?? 0) >= PASS_PERCENT;
 }
 
 /** The final test's answers stay on the server until it is graded. */

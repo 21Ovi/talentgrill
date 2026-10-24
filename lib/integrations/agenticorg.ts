@@ -46,13 +46,13 @@ const RunResponse = z.object({
 // A held run still carries the agent's full reply. Hints and practice feedback
 // are advisory, so they use it and the hold stays in AgenticOrg's approval queue;
 // the certificate decision (full_eval) waits for a human.
-const ADVISORY_TASKS: ReadonlySet<AgentTask> = new Set(["hint", "quick_eval", "followup", "course_plan"]);
+const ADVISORY_TASKS: ReadonlySet<AgentTask> = new Set(["hint", "quick_eval", "followup", "course_plan", "company_prep"]);
 
 const liveClient: AgentClient = {
   mode: "live",
   async run({ task, input, previousError, signal }) {
     const e = env();
-    // CourseCreatorAgent writes practice courses; FresherCoachAgent does the rest.
+    // CourseCreatorAgent writes practice courses; FresherCoachAgent does the rest, company prep included.
     const [agentId, agentVar] =
       task === "course_plan"
         ? [e.AGENTICORG_COURSE_AGENT_ID, "AGENTICORG_COURSE_AGENT_ID"]
@@ -155,7 +155,7 @@ const stubClient: AgentClient = {
         },
       };
     }
-    if (task === "course_plan") {
+    if (task === "course_plan" || task === "company_prep") {
       const quiz = {
         question: "What should the first sentence of an answer do?",
         options: ["Give the answer in one line", "Thank the interviewer", "List every tool you know", "Ask to skip"],
