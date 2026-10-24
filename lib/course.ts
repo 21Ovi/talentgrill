@@ -1,4 +1,5 @@
 import { env } from "./env";
+export { COMPANIES } from "./companies";
 
 /** The trainer persona CourseCreatorAgent writes as; "Matt" in AgenticOrg. */
 export const COURSE_TRAINER = {
@@ -19,6 +20,12 @@ export const COURSE_FORMAT = {
 
 /** Score (percent) on the final test that unlocks company preparation. */
 export const PASS_PERCENT = 80;
+
+
+/** Instructions for FresherCoachAgent's company_prep task (course-shaped reply). */
+export function companyPrepInstructions(company: string): string {
+  return `Write a COMPANY PREPARATION course for a fresher applying to ${company} for this role. Exactly 5 lessons, one per stage of how ${company} commonly hires freshers (e.g. the hiring process overview, aptitude/reasoning or online assessment, technical concepts, coding, HR/managerial), titled with the company name where natural. In each lesson: why = what this stage checks; teach = how to prepare for it (80 to 140 words); example = a strong sample answer to a question commonly asked at this stage; drill = one likely question to practise out loud; key_points = 3 to 5 topics to revise; mistakes = 2 or 3 common mistakes candidates make here; quiz = {question, options: 4, answer: index 0-3, explain}; resources = 2 or 3 {title, query, kind: video or article} (search queries, never URLs). Also a top-level final_test: 5 questions {question, options: 4, answer, explain} on this preparation. title = short course title naming the company; summary = one sentence. Base it on commonly reported hiring processes; never invent dates, cut-offs, salaries or exam names you are unsure of. Reply with ONE JSON object: {title, summary, lessons: [{title, why, teach, example, drill, key_points, mistakes, quiz, resources}], final_test}.`;
+}
 
 /** True when a course was written in the fuller format. */
 export function isFullCourse(course: { lessons: { key_points?: unknown }[] }): boolean {

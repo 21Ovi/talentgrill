@@ -28,7 +28,15 @@ import type { PublicState } from "@/lib/session";
 type Course = NonNullable<PublicState["course"]>;
 
 /** A short practice course, written by the trainer agent from this interview's feedback. */
-export function PracticeCourse({ sessionId, initial }: { sessionId: string; initial: Course | null }) {
+export function PracticeCourse(props: {
+  sessionId: string;
+  initial: Course | null;
+  /** Company prep is already open (80+ on the interview or the test). */
+  companyUnlocked: boolean;
+  /** Called after a passing test so the page can open company prep. */
+  onTestPassed: () => void;
+}) {
+  const { sessionId, initial, companyUnlocked, onTestPassed } = props;
   const [course, setCourse] = useState(initial);
   const [writing, setWriting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +55,17 @@ export function PracticeCourse({ sessionId, initial }: { sessionId: string; init
     }
   }
 
-  if (course) return <CourseView sessionId={sessionId} course={course} onChange={setCourse} />;
+  if (course) {
+    return (
+      <CourseView
+        sessionId={sessionId}
+        course={course}
+        onChange={setCourse}
+        companyUnlocked={companyUnlocked}
+        onTestPassed={onTestPassed}
+      />
+    );
+  }
   return (
     <section className="arrive flex flex-col gap-4" style={{ "--i": 1 } as React.CSSProperties}>
       <div className="flex flex-col gap-1">
@@ -79,7 +97,14 @@ type TestResult = {
   results: { correct: boolean; answer: number; explain: string }[];
 };
 
-function CourseView({ sessionId, course, onChange }: { sessionId: string; course: Course; onChange: (c: Course) => void }) {
+function CourseView(props: {
+  sessionId: string;
+  course: Course;
+  onChange: (c: Course) => void;
+  companyUnlocked: boolean;
+  onTestPassed: () => void;
+}) {
+  const { sessionId, course, onChange, companyUnlocked, onTestPassed } = props;
   // A lesson index, the final test, or null for the overview.
   const [open, setOpen] = useState<number | "test" | null>(null);
   const [saving, setSaving] = useState(false);
@@ -139,7 +164,10 @@ function CourseView({ sessionId, course, onChange }: { sessionId: string; course
           sessionId={sessionId}
           questions={course.final_test}
           onBack={() => setOpen(null)}
-          onScored={(best) => onChange({ ...course, testScore: best })}
+          onScored={(best) => {
+            onChange({ ...course, testScore: best });
+            if (best >= PASS_PERCENT) onTestPassed();
+          }}
         />
       ) : open !== null && open !== "test" ? (
         <LessonStep
@@ -229,7 +257,7 @@ function CourseView({ sessionId, course, onChange }: { sessionId: string; course
               </Button>
             </div>
           )}
-          <NextLevel unlocked={passed} hasTest={Boolean(course.final_test)} />
+          <NextLevel unlocked={passed || companyUnlocked} hasTest={Boolean(course.final_test)} />
         </>
       )}
     </Sheet>
@@ -261,7 +289,7 @@ function Tracker({ done, total, testScore, hasTest }: { done: number; total: num
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+export function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-2">
       <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">{title}</h4>
@@ -275,7 +303,7 @@ function resourceUrl(r: { query: string; kind: "video" | "article" }): string {
   return r.kind === "video" ? `https://www.youtube.com/results?search_query=${q}` : `https://www.google.com/search?q=${q}`;
 }
 
-function LessonStep(props: {
+export function LessonStep(props: {
   lesson: Lesson;
   number: number;
   total: number;
@@ -385,7 +413,7 @@ function LessonStep(props: {
 }
 
 /** A one-question check with instant feedback; answers are in the lesson itself. */
-function QuickCheck({ quiz }: { quiz: QuizQ }) {
+export function QuickCheck({ quiz }: { quiz: QuizQ }) {
   const [picked, setPicked] = useState<number | null>(null);
   return (
     <div className="flex flex-col gap-2">
@@ -536,7 +564,7 @@ function NextLevel({ unlocked, hasTest }: { unlocked: boolean; hasTest: boolean 
       </p>
       <p className="text-[15px] leading-snug text-muted">
         {unlocked
-          ? "You passed. Prepare for a specific company's rounds, topics and likely questions below."
+          ? "Unlocked. Pick a company below for its rounds, topics, likely questions and a practice test."
           : `Score ${PASS_PERCENT}% or more on the final test to unlock preparation for specific companies like TCS, Infosys, Accenture and Amazon.`}
       </p>
     </div>

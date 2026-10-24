@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { wordCount } from "../signals";
 
-export type AgentTask = "hint" | "quick_eval" | "followup" | "full_eval" | "course_plan";
+export type AgentTask = "hint" | "quick_eval" | "followup" | "full_eval" | "course_plan" | "company_prep";
 
 export const HintOutput = z.object({
   hint: z

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Brand, Button, Notice, Orb, SegmentedControl, Sheet, SoundToggle } from "@/components/ui";
 import { LiveInterview } from "@/components/LiveInterview";
+import { CompanyPrep } from "@/components/CompanyPrep";
 import { PracticeCourse } from "@/components/PracticeCourse";
 import { useCanRecord, VoiceAnswer, type VoiceTake } from "@/components/VoiceAnswer";
 import { api, errorMessage } from "@/lib/clientApi";
@@ -86,7 +87,17 @@ export function Interview({ sessionId }: { sessionId: string }) {
         {view?.next === "upsell" && view.quickFeedback && (
           <>
             <FeedbackPanel feedback={view.quickFeedback} firstName={view.user.firstName} />
-            {(view.course || view.coursesEnabled) && <PracticeCourse sessionId={sessionId} initial={view.course} />}
+            {(view.course || view.coursesEnabled) && (
+              <PracticeCourse
+                sessionId={sessionId}
+                initial={view.course}
+                companyUnlocked={view.companyPrepUnlocked}
+                onTestPassed={() => void load()}
+              />
+            )}
+            {view.coursesEnabled && (view.companyPrepUnlocked || view.companyPreps.length > 0) && (
+              <CompanyPrep sessionId={sessionId} initial={view.companyPreps} />
+            )}
             {view.paymentsEnabled ? (
               <UpsellPanel sessionId={sessionId} pricePaise={view.pricePaise} />
             ) : (
