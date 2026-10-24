@@ -65,34 +65,41 @@ const liveClient: AgentClient = {
 };
 
 /**
- * Agents return their reply as a JSON string, an object, or an object wrapping
- * the reply text (e.g. {"response": "..."}); fences are sometimes added. Return
- * the reply as parsed JSON when possible so the caller's schema can check it.
+ * Agents return their reply as a JSON object (FresherCoachAgent does), a JSON
+ * string, or an object wrapping the reply text (e.g. {"response": "..."});
+ * fences are sometimes added. Return the reply as parsed JSON when possible so
+ * the caller's schema can check it. Never throws: bad output fails validation.
  */
 export function unwrapOutput(output: unknown): unknown {
-  if (typeof output === "string") {
-    const trimmed = output.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-    try {
-      return JSON.parse(trimmed);
-    } catch {
-      const match = trimmed.match(/\{[\s\S]*\}/);
-      return match ? JSON.parse(match[0]) : trimmed;
-    }
-  }
+  if (typeof output === "string") return parseObject(output) ?? output.trim();
   if (output && typeof output === "object" && !Array.isArray(output)) {
-    const values = Object.values(output as Record<string, unknown>);
-    const keys = Object.keys(output as Record<string, unknown>);
-    // A single wrapped reply, e.g. {"result": "{\"hint\": ...}"}.
-    if (keys.length <= 3) {
+    const o = output as Record<string, unknown>;
+    // A wrapped reply, e.g. {"result": "{\"hint\": ...}"}. A real reply such as
+    // {"hint": "..."} is left alone: only strings holding a JSON object unwrap.
+    if (Object.keys(o).length <= 3) {
       for (const k of ["response", "result", "output", "text", "answer", "content", "message"]) {
-        const v = (output as Record<string, unknown>)[k];
-        if (typeof v === "string" && v.includes("{")) return unwrapOutput(v);
+        const v = o[k];
         if (v && typeof v === "object" && !Array.isArray(v)) return v;
+        const parsed = typeof v === "string" ? parseObject(v) : undefined;
+        if (parsed) return parsed;
       }
     }
-    if (values.length === 1 && typeof values[0] === "string") return unwrapOutput(values[0]);
   }
   return output;
+}
+
+function parseObject(text: string): Record<string, unknown> | undefined {
+  const trimmed = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  for (const candidate of [trimmed, trimmed.match(/\{[\s\S]*\}/)?.[0]]) {
+    if (!candidate?.startsWith("{")) continue;
+    try {
+      const parsed: unknown = JSON.parse(candidate);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed as Record<string, unknown>;
+    } catch {
+      // Not JSON; try the next candidate.
+    }
+  }
+  return undefined;
 }
 
 // Stub mode: local development only (production needs ALLOW_STUBS=true). Runs are
