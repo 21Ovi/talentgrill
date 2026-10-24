@@ -1,5 +1,10 @@
 import { extractText, getDocumentProxy } from "unpdf";
-import type { ResumeProfile } from "./agent/schemas";
+import { runAgent } from "./agent/run";
+import { ResumeQuestionOutput, type ResumeProfile } from "./agent/schemas";
+import { query } from "./db";
+import { logEvent } from "./events";
+import { ROLES, type RoleId } from "./roles";
+import { buildRubric, d } from "./rubric";
 
 export const MAX_RESUME_BYTES = 2 * 1024 * 1024;
 const MIN_CHARS = 150;
@@ -54,4 +59,58 @@ export function resumeBrief(p: ResumeProfile): string {
   for (const ex of p.experience.slice(0, 3)) lines.push(`Experience: ${ex.role} at ${ex.organization}: ${ex.summary}`);
   if (p.talking_points.length) lines.push(`Worth asking about: ${p.talking_points.slice(0, 3).join(" | ")}`);
   return lines.join("\n");
+}
+
+const QUESTION_INSTRUCTIONS =
+  "Task resume_question: write ONE main interview question for this fresher, based on their resume, for the role. Pick the most interesting real project or internship and ask them to walk through a specific decision, problem or result in it. It must not overlap with the questions already in the interview (given in existing_questions). One or two short spoken sentences, no lists, no code. Reply with ONE JSON object: {kind: behavioral or situational or domain, text, domain_accuracy: {one, three, five}, problem_solving: {one, three, five}, key_points: 4 to 5 short points a strong answer covers}. Each descriptor is one short sentence on what a 1, 3 or 5 answer looks like for THIS question. Use only facts from the resume.";
+
+/**
+ * Writes the session's resume-based main question (asked first) with a rubric
+ * like the bank's. Replaces an earlier one. Returns its text, or null on failure.
+ */
+export async function writeResumeQuestion(opts: {
+  sessionId: string;
+  userId: string;
+  role: RoleId;
+  roleLabel: string;
+  profile: ResumeProfile;
+  existingQuestions: string[];
+}): Promise<string | null> {
+  const result = await runAgent({
+    task: "resume_question",
+    sessionId: opts.sessionId,
+    userId: opts.userId,
+    schema: ResumeQuestionOutput,
+    input: {
+      role: opts.roleLabel,
+      resume: resumeBrief(opts.profile),
+      existing_questions: opts.existingQuestions,
+      instructions: QUESTION_INSTRUCTIONS,
+    },
+  });
+  if (!result.ok) return null;
+  const q = result.output;
+  const rubric = buildRubric(opts.role, {
+    kind: q.kind,
+    text: q.text,
+    domain_accuracy: d(q.domain_accuracy.one, q.domain_accuracy.three, q.domain_accuracy.five),
+    problem_solving: d(q.problem_solving.one, q.problem_solving.three, q.problem_solving.five),
+    key_points: q.key_points,
+  });
+  const domain = ROLES.find((r) => r.id === opts.role)?.domain ?? "Tech";
+  await query("delete from questions where session_id = $1", [opts.sessionId]);
+  // Position 0 sorts it before the bank's free questions, so it is asked first.
+  const [row] = await query<{ id: string }>(
+    `insert into questions (domain, role, kind, tier, position, question_text, rubric, session_id)
+     values ($1, $2, $3, 'free', 0, $4, $5, $6) returning id`,
+    [domain, opts.role, q.kind, q.text, JSON.stringify(rubric), opts.sessionId],
+  );
+  await logEvent({
+    actor: "agent",
+    type: "resume_question_written",
+    userId: opts.userId,
+    sessionId: opts.sessionId,
+    payload: { question_id: row.id, agent_run_id: result.runId, kind: q.kind },
+  });
+  return q.text;
 }

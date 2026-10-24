@@ -11,7 +11,7 @@ async function main() {
       const res = await db.query(
         `insert into questions (domain, role, kind, tier, position, question_text, rubric)
          values ($1, $2, $3, $4, $5, $6, $7)
-         on conflict (role, tier, position) do update
+         on conflict (role, tier, position) where session_id is null do update
            set domain = excluded.domain, kind = excluded.kind,
                question_text = excluded.question_text, rubric = excluded.rubric
          where (questions.domain, questions.kind, questions.question_text, questions.rubric)

@@ -2,7 +2,7 @@ import { CoursePlanOutput, QuickEvalOutput, ResumeProfile } from "./agent/schema
 import { coursesEnabled, PASS_PERCENT } from "./course";
 import { pool, type Queryable } from "./db";
 import { env } from "./env";
-import { FREE_QUESTIONS, PRO_QUESTIONS, ROLES, type RoleId } from "./roles";
+import { ROLES, type RoleId } from "./roles";
 import type { Rubric } from "./rubric";
 
 export type Kind = "behavioral" | "situational" | "domain";
@@ -16,6 +16,8 @@ export type SessionQuestion = {
   question_text: string;
   rubric: Rubric;
   answered: boolean;
+  /** Set for the resume-based question written for this session only. */
+  session_id: string | null;
 };
 
 export type Next = "answer" | "quick_eval" | "upsell" | "full_eval";
@@ -69,10 +71,10 @@ export async function loadSession(id: string, db: Queryable = pool()): Promise<L
 
   const questions = (
     await db.query<SessionQuestion>(
-      `select q.id, q.tier, q.position, q.kind, q.question_text, q.rubric,
+      `select q.id, q.tier, q.position, q.kind, q.question_text, q.rubric, q.session_id,
               exists (select 1 from answers a where a.session_id = $1 and a.question_id = q.id) as answered
          from questions q
-        where q.role = $2 and (q.tier = 'free' or $3)
+        where ((q.role = $2 and q.session_id is null) or q.session_id = $1) and (q.tier = 'free' or $3)
         order by q.tier = 'pro', q.position`,
       [id, s.role, s.is_pro],
     )
@@ -154,7 +156,8 @@ export async function loadSession(id: string, db: Queryable = pool()): Promise<L
 
 /** What the browser may see: no rubrics, no pro questions before payment. */
 export function publicState(s: LoadedSession) {
-  const total = s.isPro ? FREE_QUESTIONS + PRO_QUESTIONS : FREE_QUESTIONS;
+  // Free questions (plus the resume question, if any), and pro ones once paid.
+  const total = s.questions.length;
   return {
     session: { id: s.id, role: s.role, roleLabel: s.roleLabel, status: s.status, isPro: s.isPro },
     user: { firstName: s.firstName },
@@ -173,6 +176,8 @@ export function publicState(s: LoadedSession) {
     coursesEnabled: coursesEnabled(),
     companyPreps: s.companyPreps,
     resume: s.resume,
+    /** A main question was written from the resume and is asked first. */
+    resumeQuestion: s.questions.some((q) => q.session_id !== null),
     companyPrepUnlocked: companyPrepUnlocked(s),
     pricePaise: env().PRO_PRICE_PAISE,
     paymentsEnabled: env().PAYMENTS_ENABLED,
