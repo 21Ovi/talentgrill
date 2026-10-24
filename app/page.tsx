@@ -33,8 +33,8 @@ export default function Home() {
               Could you answer that out loud, right now?
             </h1>
             <p className="text-[17px] leading-relaxed text-muted">
-              Practise placement interviews by speaking, the way the real one happens. Two questions are free.
-              ₹5 unlocks the full mock and a human-verified certificate.
+              Practise placement interviews in a live voice conversation with an AI interviewer, the way the real one
+              happens. Free, with instant feedback.
             </p>
             <LiveCounter />
           </div>

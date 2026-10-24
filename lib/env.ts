@@ -20,10 +20,21 @@ const schema = z.object({
 
   ALLOW_STUBS: flag,
   AGENTICORG_MODE: mode,
+  // Pine Labs' hackathon instance; the SDK default is app.agenticorg.ai.
+  AGENTICORG_BASE_URL: z.url().default("https://agenticorg.hackathon.pinelabs.com"),
+  AGENTICORG_API_KEY: z.string().min(1).optional(),
+  // UUID of FresherCoachAgent (shared visibility, so API keys can run it).
+  AGENTICORG_AGENT_ID: z.guid().optional(),
   ELEVENLABS_MODE: mode,
   ELEVENLABS_API_KEY: z.string().min(1).optional(),
   // ElevenLabs premade voice "Rachel"; swap for an Indian-English voice from the library.
   ELEVENLABS_VOICE_ID: z.string().min(1).default("21m00Tcm4TlvDq8ikWAM"),
+  // Live two-way voice interview with the ElevenLabs interviewer agent.
+  LIVE_INTERVIEW_ENABLED: z.stringbool().default(true),
+  // Optional: pin an existing interviewer agent instead of creating one by name.
+  ELEVENLABS_AGENT_ID: z.string().min(1).optional(),
+  // Payments are on hold for the event; the upsell is hidden while false.
+  PAYMENTS_ENABLED: flag,
   PINELABS_MODE: mode,
   // uat until the Pine Labs team switches the merchant to production keys.
   PINELABS_ENV: z.enum(["uat", "production"]).default("uat"),

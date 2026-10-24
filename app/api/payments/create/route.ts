@@ -12,6 +12,7 @@ const Body = z.object({ sessionId: z.uuid("Session not found.") });
 // The amount always comes from server config, never from the client.
 export async function POST(req: Request) {
   return handle("payment", async () => {
+    if (!env().PAYMENTS_ENABLED) throw new HttpError(503, "Payments are paused for now.");
     const { sessionId } = await readJson(req, Body);
     if (!take(`pay:session:${sessionId}`, 5, 1 / 30)) {
       throw new HttpError(429, "Too many payment attempts. Please wait a few seconds and try again.");
