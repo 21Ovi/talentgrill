@@ -4,7 +4,7 @@ import { query } from "@/lib/db";
 import { logEvent, requestMeta } from "@/lib/events";
 import { handle, HttpError, isUuid, json, notFound } from "@/lib/http";
 import { clientIp, take } from "@/lib/rateLimit";
-import { readResume, RESUME_INSTRUCTIONS } from "@/lib/resume";
+import { readResume, RESUME_INSTRUCTIONS, writeResumeQuestion } from "@/lib/resume";
 import { loadSession } from "@/lib/session";
 
 // Optional resume before the interview: the text goes to ResumeReaderAgent and
@@ -20,7 +20,10 @@ export async function POST(req: Request, ctx: RouteContext<"/api/sessions/[id]/r
       }
       const s = await loadSession(id);
       if (!s) throw new HttpError(404, "Session not found.");
-      if (s.questions.some((q) => q.answered)) throw new HttpError(409, "Add your resume before the interview starts.");
+      const [call] = await query("select 1 from live_calls where session_id = $1 limit 1", [id]);
+      if (s.questions.some((q) => q.answered) || call) {
+        throw new HttpError(409, "Add your resume before the interview starts.");
+      }
 
       const form = await req.formData().catch(() => null);
       const file = form?.get("file");
@@ -73,7 +76,16 @@ export async function POST(req: Request, ctx: RouteContext<"/api/sessions/[id]/r
           experience: result.output.experience.length,
         },
       });
-      return json({ resume: result.output });
+      // The resume-based main question; the interview still works without it.
+      const question = await writeResumeQuestion({
+        sessionId: id,
+        userId: s.userId,
+        role: s.role,
+        roleLabel: s.roleLabel,
+        profile: result.output,
+        existingQuestions: s.questions.filter((q) => q.session_id === null).map((q) => q.question_text),
+      });
+      return json({ resume: result.output, resumeQuestion: question !== null });
     },
     { sessionId: id },
   );

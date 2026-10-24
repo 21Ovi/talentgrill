@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { wordCount } from "../signals";
 
-export type AgentTask = "hint" | "quick_eval" | "followup" | "full_eval" | "course_plan" | "company_prep" | "resume_read";
+export type AgentTask = "hint" | "quick_eval" | "followup" | "full_eval" | "course_plan" | "company_prep" | "resume_read" | "resume_question";
 
 export const HintOutput = z.object({
   hint: z
@@ -85,3 +85,15 @@ export const ResumeProfile = z.object({
   gaps: z.array(text(3, 300)).max(4).catch([]),
 });
 export type ResumeProfile = z.infer<typeof ResumeProfile>;
+
+const Levels = z.object({ one: text(3, 300), three: text(3, 300), five: text(3, 300) });
+
+/** A main interview question written from the resume, with its rubric parts. */
+export const ResumeQuestionOutput = z.object({
+  kind: z.enum(["behavioral", "situational", "domain"]),
+  text: text(10, 300),
+  domain_accuracy: Levels,
+  problem_solving: Levels,
+  key_points: z.array(text(3, 200)).min(3).max(6),
+});
+export type ResumeQuestionOutput = z.infer<typeof ResumeQuestionOutput>;

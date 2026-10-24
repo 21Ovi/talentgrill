@@ -22,8 +22,13 @@ CODE=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/api/login" -H "$J" 
 RESUME=$(mktemp)
 echo "B.Tech Computer Science student. Projects: a class attendance app built with Node.js and React. Skills: Java, SQL, Git. Internship: web developer intern at a startup, built REST APIs and fixed bugs in the admin dashboard." > "$RESUME"
 curl -sf -X POST "$BASE/api/sessions/$SID/resume" -F "file=@$RESUME;type=text/plain" | field resume.headline > /dev/null
+[ "$(curl -sf "$BASE/api/sessions/$SID" | field progress.total)" = "3" ] || { echo "expected the resume question to make 3"; exit 1; }
 
-for n in 1 2; do
+# The resume adds a question, so answer until the session moves on.
+n=0
+while [ "$(curl -sf "$BASE/api/sessions/$SID" | field next)" = "answer" ]; do
+  n=$((n + 1))
+  [ $n -le 5 ] || { echo "too many questions"; exit 1; }
   Q=$(curl -sf "$BASE/api/sessions/$SID" | field current.id)
   curl -sf -X POST "$BASE/api/sessions/$SID/hint" -H "$J" -d "{\"questionId\":\"$Q\"}" | field hint > /dev/null
   curl -sf -X POST "$BASE/api/sessions/$SID/answers" -H "$J" \

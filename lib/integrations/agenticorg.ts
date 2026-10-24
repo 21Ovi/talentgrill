@@ -53,6 +53,7 @@ const ADVISORY_TASKS: ReadonlySet<AgentTask> = new Set([
   "course_plan",
   "company_prep",
   "resume_read",
+  "resume_question",
 ]);
 
 const liveClient: AgentClient = {
@@ -205,6 +206,19 @@ const stubClient: AgentClient = {
           achievements: [],
           talking_points: ["How they designed the attendance app's backend"],
           gaps: ["No measurable results on projects"],
+        },
+      };
+    }
+    if (task === "resume_question") {
+      const level = { one: "Vague, no detail.", three: "Some detail, missing the why.", five: "Specific, explains decisions and the result." };
+      return {
+        runId: null,
+        output: {
+          kind: "behavioral",
+          text: "Walk me through how you built the backend for your attendance app. What was the hardest part?",
+          domain_accuracy: level,
+          problem_solving: level,
+          key_points: ["What the app does", "Their own part in it", "One hard problem and how they solved it"],
         },
       };
     }

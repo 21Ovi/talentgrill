@@ -10,7 +10,15 @@ import type { PublicState } from "@/lib/session";
 type Resume = NonNullable<PublicState["resume"]>;
 
 /** Optional resume before the interview; ResumeReaderAgent turns it into a profile. */
-export function ResumeCard({ sessionId, initial }: { sessionId: string; initial: Resume | null }) {
+export function ResumeCard(props: {
+  sessionId: string;
+  initial: Resume | null;
+  /** Emma opens with a question written from the resume. */
+  hasQuestion: boolean;
+  /** Reloads the session so the question count includes the resume question. */
+  onUploaded: () => Promise<void>;
+}) {
+  const { sessionId, initial, hasQuestion, onUploaded } = props;
   const [resume, setResume] = useState(initial);
   const [reading, setReading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,6 +33,7 @@ export function ResumeCard({ sessionId, initial }: { sessionId: string; initial:
       const res = await api<{ resume: Resume }>(`/api/sessions/${sessionId}/resume`, form);
       setResume(res.resume);
       cue("success");
+      await onUploaded();
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -63,9 +72,13 @@ export function ResumeCard({ sessionId, initial }: { sessionId: string; initial:
             ))}
           </div>
         )}
-        {resume.talking_points[0] && (
-          <p className="text-sm text-muted">Emma may ask about: {resume.talking_points[0]}</p>
-        )}
+        <p className="text-sm text-muted">
+          {hasQuestion
+            ? "Emma will open with one question about your resume, then the role questions. It's scored like the others."
+            : resume.talking_points[0]
+              ? `Emma may ask about: ${resume.talking_points[0]}`
+              : "Emma will use it to personalise the interview."}
+        </p>
         {error && <Notice>{error}</Notice>}
         <button
           type="button"

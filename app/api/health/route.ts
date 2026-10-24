@@ -12,7 +12,7 @@ export async function GET() {
   try {
     const { rows } = await pool().query<{ migrations: number; questions: number }>(
       `select (select count(*) from schema_migrations)::int as migrations,
-              (select count(*) from questions)::int as questions`,
+              (select count(*) from questions where session_id is null)::int as questions`,
     );
     db = { ok: true, latency_ms: Date.now() - started, ...rows[0] };
   } catch (err) {

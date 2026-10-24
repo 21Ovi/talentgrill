@@ -75,12 +75,21 @@ export function Interview({ sessionId }: { sessionId: string }) {
               onDone={load}
               onTypeInstead={() => setTyping(true)}
               beforeStart={
-                view.progress.answered === 0 && <ResumeCard sessionId={sessionId} initial={view.resume} />
+                view.progress.answered === 0 && (
+                  <ResumeCard
+                    sessionId={sessionId}
+                    initial={view.resume}
+                    hasQuestion={view.resumeQuestion}
+                    onUploaded={load}
+                  />
+                )
               }
             />
           ) : (
             <>
-              {view.progress.answered === 0 && <ResumeCard sessionId={sessionId} initial={view.resume} />}
+              {view.progress.answered === 0 && (
+                <ResumeCard sessionId={sessionId} initial={view.resume} hasQuestion={view.resumeQuestion} onUploaded={load} />
+              )}
               <QuestionStep
                 key={view.current.id}
                 sessionId={sessionId}
@@ -441,7 +450,7 @@ function FeedbackPanel({ feedback, firstName }: { feedback: QuickFeedback; first
           ))}
         </ol>
       </div>
-      <p className="text-sm text-faint">This is an early estimate from two answers. The full mock scores every rubric dimension.</p>
+      <p className="text-sm text-faint">This is an early estimate from your answers. The full mock scores every rubric dimension.</p>
     </Sheet>
   );
 }
