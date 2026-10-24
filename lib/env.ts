@@ -21,6 +21,9 @@ const schema = z.object({
   ALLOW_STUBS: flag,
   AGENTICORG_MODE: mode,
   ELEVENLABS_MODE: mode,
+  ELEVENLABS_API_KEY: z.string().min(1).optional(),
+  // ElevenLabs premade voice "Rachel"; swap for an Indian-English voice from the library.
+  ELEVENLABS_VOICE_ID: z.string().min(1).default("21m00Tcm4TlvDq8ikWAM"),
   PINELABS_MODE: mode,
   VOBIZ_ENABLED: flag,
 });

@@ -13,6 +13,7 @@ export async function GET() {
            join users u on u.id = s.user_id
            join answers a on a.session_id = s.id
           where not u.is_internal and not u.is_event_staff
+            and not exists (select 1 from voice_takes v where v.id = a.voice_take_id and v.mode = 'stub')
             and a.created_at >= (date_trunc('day', now() at time zone 'Asia/Kolkata') at time zone 'Asia/Kolkata')`,
       );
       cache = { at: Date.now(), interviewsToday: row.n };

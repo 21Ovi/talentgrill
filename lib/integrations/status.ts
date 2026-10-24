@@ -20,6 +20,9 @@ export function integrationMode(vendor: Vendor): Mode {
   if (mode === "stub" && e.NODE_ENV === "production" && !e.ALLOW_STUBS) {
     throw new Error(`${vendor} is in stub mode but ALLOW_STUBS is not true`);
   }
+  if (vendor === "elevenlabs" && mode === "live" && !e.ELEVENLABS_API_KEY) {
+    throw new Error("elevenlabs is live but ELEVENLABS_API_KEY is not set");
+  }
   return mode;
 }
 

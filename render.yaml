@@ -37,6 +37,10 @@ services:
         value: live
       - key: ELEVENLABS_MODE
         value: live
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: ELEVENLABS_VOICE_ID
+        sync: false
       - key: PINELABS_MODE
         value: live
       - key: VOBIZ_ENABLED
