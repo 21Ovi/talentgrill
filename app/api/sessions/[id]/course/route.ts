@@ -1,11 +1,11 @@
 import { runAgent } from "@/lib/agent/run";
-import { CoursePlanOutput } from "@/lib/agent/schemas";
-import { COURSE_TRAINER, coursesEnabled } from "@/lib/course";
+import { FullCoursePlanOutput } from "@/lib/agent/schemas";
+import { COURSE_FORMAT, COURSE_TRAINER, coursesEnabled, isFullCourse } from "@/lib/course";
 import { query } from "@/lib/db";
 import { logEvent, requestMeta } from "@/lib/events";
 import { handle, HttpError, isUuid, json, notFound } from "@/lib/http";
 import { clientIp, take } from "@/lib/rateLimit";
-import { loadSession } from "@/lib/session";
+import { loadSession, publicCourse } from "@/lib/session";
 
 // Double taps share one agent run per session, like quick feedback.
 const inFlight = new Map<string, Promise<Response>>();
@@ -30,7 +30,9 @@ export async function POST(req: Request, ctx: RouteContext<"/api/sessions/[id]/c
 async function buildCourse(req: Request, id: string): Promise<Response> {
   const s = await loadSession(id);
   if (!s) throw new HttpError(404, "Session not found.");
-  if (s.course) return json({ course: s.course });
+  // An older course can be rebuilt once in the fuller format (?upgrade=1).
+  const upgrade = new URL(req.url).searchParams.get("upgrade") === "1" && s.course !== null && !isFullCourse(s.course);
+  if (s.course && !upgrade) return json({ course: publicCourse(s.course) });
   if (!s.quickFeedback) throw new HttpError(409, "Finish the interview and get your feedback first.");
   if (!coursesEnabled()) throw new HttpError(503, "Practice courses are off right now.");
   if (!take(`course:session:${id}`, 3, 1 / 120) || !take(`course:ip:${clientIp(req)}`, 60, 1)) {
@@ -42,7 +44,7 @@ async function buildCourse(req: Request, id: string): Promise<Response> {
     type: "course_requested",
     userId: s.userId,
     sessionId: id,
-    payload: { trainer: COURSE_TRAINER.name, ...requestMeta(req) },
+    payload: { trainer: COURSE_TRAINER.name, upgrade, ...requestMeta(req) },
   });
 
   const answers = await query<{ question_text: string; kind: string; transcript: string; hints_used: number }>(
@@ -57,10 +59,11 @@ async function buildCourse(req: Request, id: string): Promise<Response> {
     task: "course_plan",
     sessionId: id,
     userId: s.userId,
-    schema: CoursePlanOutput,
+    schema: FullCoursePlanOutput,
     input: {
       role: s.roleLabel,
       trainer: COURSE_TRAINER,
+      course_format: COURSE_FORMAT,
       overall_estimate: s.quickFeedback.overall_estimate,
       strength: s.quickFeedback.strength,
       fixes: s.quickFeedback.fixes,
@@ -77,14 +80,17 @@ async function buildCourse(req: Request, id: string): Promise<Response> {
   }
 
   const [saved] = await query<{ id: string }>(
-    `insert into courses (session_id, agent_run_id, trainer, plan) values ($1, $2, $3, $4)
-     on conflict (session_id) do nothing returning id`,
+    upgrade
+      ? `update courses set agent_run_id = $2, trainer = $3, plan = $4, completed_lessons = '{}'
+          where session_id = $1 returning id`
+      : `insert into courses (session_id, agent_run_id, trainer, plan) values ($1, $2, $3, $4)
+         on conflict (session_id) do nothing returning id`,
     [id, result.runId, COURSE_TRAINER.name, JSON.stringify(result.output)],
   );
   if (saved) {
     await logEvent({
       actor: "agent",
-      type: "course_generated",
+      type: upgrade ? "course_upgraded" : "course_generated",
       userId: s.userId,
       sessionId: id,
       payload: {
@@ -97,5 +103,6 @@ async function buildCourse(req: Request, id: string): Promise<Response> {
     });
   }
   const after = await loadSession(id);
-  return json({ course: after?.course ?? { ...result.output, trainer: COURSE_TRAINER.name, completed: [] } });
+  const course = after?.course ?? { ...result.output, trainer: COURSE_TRAINER.name, completed: [], testScore: null };
+  return json({ course: publicCourse(course) });
 }

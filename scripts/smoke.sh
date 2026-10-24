@@ -28,6 +28,7 @@ done
 curl -sf -X POST "$BASE/api/sessions/$SID/quick-eval" | field quickFeedback.overall_estimate > /dev/null
 curl -sf -X POST "$BASE/api/sessions/$SID/course" | field course.lessons.2.drill > /dev/null
 curl -sf -X POST "$BASE/api/sessions/$SID/course/lessons" -H "$J" -d '{"lesson":1}' | field completed.0 > /dev/null
+[ "$(curl -sf -X POST "$BASE/api/sessions/$SID/course/test" -H "$J" -d '{"answers":[0,0,0]}' | field score)" = "100" ] || { echo "expected the stub final test to score 100"; exit 1; }
 NEXT=$(curl -sf "$BASE/api/sessions/$SID" | field next)
 [ "$NEXT" = "upsell" ] || { echo "expected next=upsell, got $NEXT"; exit 1; }
 

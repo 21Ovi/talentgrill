@@ -156,19 +156,30 @@ const stubClient: AgentClient = {
       };
     }
     if (task === "course_plan") {
+      const quiz = {
+        question: "What should the first sentence of an answer do?",
+        options: ["Give the answer in one line", "Thank the interviewer", "List every tool you know", "Ask to skip"],
+        answer: 0,
+        explain: "Leading with the answer shows you understood the question.",
+      };
       const lesson = (title: string) => ({
         title,
         why: "Your feedback pointed here, so it is the quickest win.",
         teach: "Start with a one-line summary, then walk through the steps in order, and finish with what changed because of you.",
         example: "In my final-year project I owned the backend. First I listed the APIs we needed, then built and tested them one by one.",
         drill: "Explain one project you are proud of in under two minutes.",
+        key_points: ["Lead with the answer", "Explain the steps in order", "End with the result"],
+        mistakes: ["Starting with background nobody asked for", "Ending without a result"],
+        quiz,
+        resources: [{ title: "STAR method explained", query: "STAR method interview answers", kind: "video" }],
       });
       return {
         runId: null,
         output: {
           title: "Sharper answers in 15 minutes",
-          summary: "Three short lessons built from your feedback, each with a question to practise out loud.",
+          summary: "Short lessons built from your feedback, each with a question to practise out loud.",
           lessons: [lesson("Lead with the answer"), lesson("Tell it in order"), lesson("Prove it with a number")],
+          final_test: [quiz, quiz, quiz],
         },
       };
     }

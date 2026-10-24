@@ -5,7 +5,9 @@ import { agentClient, type AgentClient } from "../integrations/agenticorg";
 import { recordError, recordSuccess } from "../integrations/status";
 import type { AgentTask } from "./schemas";
 
-const TIMEOUT_MS = 45_000;
+// Courses are long documents; everything else is a short reply.
+const TIMEOUT_MS: Partial<Record<AgentTask, number>> = { course_plan: 90_000 };
+const DEFAULT_TIMEOUT_MS = 45_000;
 
 export type AgentResult<T> = { ok: true; output: T; runId: string } | { ok: false; error: string; runId: string | null };
 
@@ -49,7 +51,7 @@ export async function runAgent<T>(opts: {
   let vendor: { confidence?: number | null; held_for_approval?: string | null } = {};
   let error = "";
   let output: T | null = null;
-  const signal = AbortSignal.timeout(TIMEOUT_MS);
+  const signal = AbortSignal.timeout(TIMEOUT_MS[task] ?? DEFAULT_TIMEOUT_MS);
   for (let attempt = 1; attempt <= 2 && output === null; attempt++) {
     try {
       const res = await client.run({ task, input, previousError: error || undefined, signal });
