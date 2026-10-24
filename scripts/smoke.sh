@@ -11,7 +11,12 @@ curl -sf --retry 30 --retry-connrefused --retry-delay 1 "$BASE/api/health" > /de
 curl -sf -o /dev/null "$BASE/"
 
 SID=$(curl -sf -X POST "$BASE/api/signup" -H "$J" \
-  -d '{"name":"CI Smoke","phone":"9000000099","role":"software-engineer","consent":true,"isEventStaff":true,"src":"ci"}' | field sessionId)
+  -d '{"name":"CI Smoke","phone":"9000000099","password":"ci-smoke-pass","role":"software-engineer","consent":true,"isEventStaff":true,"src":"ci"}' | field sessionId)
+
+# Log in with the password; a wrong one is rejected.
+[ "$(curl -sf -X POST "$BASE/api/login" -H "$J" -d '{"phone":"9000000099","password":"ci-smoke-pass"}' | field sessionId)" = "$SID" ] || { echo "login did not return the latest session"; exit 1; }
+CODE=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/api/login" -H "$J" -d '{"phone":"9000000099","password":"wrong-password"}')
+[ "$CODE" = "401" ] || { echo "expected wrong password to get 401, got $CODE"; exit 1; }
 
 for n in 1 2; do
   Q=$(curl -sf "$BASE/api/sessions/$SID" | field current.id)

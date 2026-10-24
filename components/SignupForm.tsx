@@ -1,6 +1,7 @@
 "use client";
 
 import { Check } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Button, Notice, Sheet } from "@/components/ui";
@@ -9,7 +10,7 @@ import { cue } from "@/lib/feedback";
 import { ROLES } from "@/lib/roles";
 
 /** Keeps the 10 local digits, accepting pasted +91 / 0 prefixes. */
-function localDigits(input: string): string {
+export function localDigits(input: string): string {
   const digits = input.replace(/\D/g, "");
   if (digits.length > 10 && digits.startsWith("91")) return digits.slice(2, 12);
   if (digits.length > 10 && digits.startsWith("0")) return digits.slice(1, 11);
@@ -20,6 +21,7 @@ export function SignupForm() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
   const [role, setRole] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
   const [isEventStaff, setIsEventStaff] = useState(false);
@@ -30,6 +32,7 @@ export function SignupForm() {
     e.preventDefault();
     if (!role) return setError("Pick the role you're preparing for.");
     if (!/^[6-9]\d{9}$/.test(phone)) return setError("Enter a 10-digit Indian mobile number.");
+    if (password.length < 8) return setError("Use at least 8 characters for your password.");
     if (!consent) return setError("Tick the consent note to continue.");
 
     setSubmitting(true);
@@ -39,6 +42,7 @@ export function SignupForm() {
       const { sessionId } = await api<{ sessionId: string }>("/api/signup", {
         name,
         phone,
+        password,
         role,
         consent,
         isEventStaff,
@@ -58,7 +62,7 @@ export function SignupForm() {
       <form onSubmit={onSubmit} className="flex flex-col gap-6" noValidate>
         <div className="flex flex-col gap-1">
           <h2 className="text-[22px] font-semibold tracking-[-0.02em]">Start your free interview</h2>
-          <p className="text-[15px] text-muted">Takes about five minutes. No password.</p>
+          <p className="text-[15px] text-muted">Takes about five minutes. Your password lets you come back later.</p>
         </div>
 
         {/* Grouped fields, like a settings list: one surface, hairline between rows. */}
@@ -88,6 +92,21 @@ export function SignupForm() {
               required
               placeholder="98765 43210"
               className="h-full min-w-0 flex-1 bg-transparent text-[17px] tabular-nums outline-none placeholder:text-faint"
+            />
+          </label>
+          <div className="ml-4 h-px bg-line" />
+          <label className="flex h-14 items-center gap-3 px-4">
+            <span className="w-16 shrink-0 text-[15px] text-muted">Password</span>
+            <input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              type="password"
+              autoComplete="new-password"
+              required
+              minLength={8}
+              maxLength={128}
+              placeholder="At least 8 characters"
+              className="h-full min-w-0 flex-1 bg-transparent text-[17px] outline-none placeholder:text-faint"
             />
           </label>
         </div>
@@ -132,6 +151,12 @@ export function SignupForm() {
         <Button type="submit" size="lg" loading={submitting} className="w-full">
           {submitting ? "Starting your interview…" : "Start my free interview"}
         </Button>
+        <p className="text-center text-[15px] text-muted">
+          Already practising?{" "}
+          <Link href="/login" className="font-semibold text-ink underline-offset-4 hover:underline">
+            Log in
+          </Link>
+        </p>
       </form>
     </Sheet>
   );

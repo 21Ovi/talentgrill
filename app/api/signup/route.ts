@@ -1,9 +1,10 @@
 import { randomInt } from "node:crypto";
 import { z } from "zod";
-import { tx } from "@/lib/db";
+import { pool, tx } from "@/lib/db";
 import { env } from "@/lib/env";
 import { logEvent, requestMeta } from "@/lib/events";
 import { handle, HttpError, json, readJson } from "@/lib/http";
+import { hashPassword, verifyPassword } from "@/lib/password";
 import { normalizeIndianPhone } from "@/lib/phone";
 import { clientIp, take } from "@/lib/rateLimit";
 import { ROLES } from "@/lib/roles";
@@ -25,6 +26,10 @@ const Body = z.object({
       if (!normalized) ctx.addIssue({ code: "custom", message: "Enter a 10-digit Indian mobile number." });
       return normalized ?? "";
     }),
+  password: z
+    .string()
+    .min(8, "Use at least 8 characters for your password.")
+    .max(128, "Please use a shorter password."),
   role: z.enum(ROLES.map((r) => r.id) as [string, ...string[]], { error: "Pick the role you're preparing for." }),
   consent: z.literal(true, { error: "Please accept the consent note to continue." }),
   isEventStaff: z.boolean().default(false),
@@ -54,6 +59,15 @@ export async function POST(req: Request) {
       throw new HttpError(429, "Too many attempts for this number. Please wait a minute.");
     }
 
+    // A number that already has a password needs it; one from before passwords gets this one.
+    const [existing] = (
+      await pool().query<{ password_hash: string | null }>("select password_hash from users where phone = $1", [body.phone])
+    ).rows;
+    if (existing?.password_hash && !(await verifyPassword(body.password, existing.password_hash))) {
+      throw new HttpError(409, "This number already has an account. Log in with your password, or check the password.");
+    }
+    const passwordHash = existing?.password_hash ?? (await hashPassword(body.password));
+
     const isInternal = env().internalPhones.has(body.phone);
     const meta = requestMeta(req);
 
@@ -69,15 +83,26 @@ export async function POST(req: Request) {
         await db.query("savepoint upsert_user");
         try {
           const { rows } = await db.query<{ id: string; inserted: boolean }>(
-            `insert into users (name, phone, role_target, ref_code, referred_by, source, is_internal, is_event_staff, consent_at)
-             values ($1, $2, $3, $4, $5, $6, $7, $8, now())
+            `insert into users (name, phone, role_target, ref_code, referred_by, source, is_internal, is_event_staff, consent_at, password_hash)
+             values ($1, $2, $3, $4, $5, $6, $7, $8, now(), $9)
              on conflict (phone) do update set
                name = excluded.name,
+               password_hash = coalesce(users.password_hash, excluded.password_hash),
                role_target = excluded.role_target,
                is_internal = excluded.is_internal,
                is_event_staff = users.is_event_staff or excluded.is_event_staff
              returning id, (xmax = 0) as inserted`,
-            [body.name, body.phone, body.role, refCode(), referrer?.id ?? null, body.src ?? "direct", isInternal, body.isEventStaff],
+            [
+              body.name,
+              body.phone,
+              body.role,
+              refCode(),
+              referrer?.id ?? null,
+              body.src ?? "direct",
+              isInternal,
+              body.isEventStaff,
+              passwordHash,
+            ],
           );
           user = rows[0];
         } catch (err) {
