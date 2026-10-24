@@ -40,6 +40,14 @@ npm run dev
   generated secrets, migrations and seed before each deploy). With
   `autoDeployTrigger: checksPass`, every push to `main` deploys once CI passes.
 
+## Admin
+
+`/admin` shows signups (today and total), where they came from (`?src=`), roles, the interview
+funnel and the 25 latest signups with phone numbers partly hidden. It refreshes every 30 seconds.
+Sign in with `ADMIN_PASSWORD`; the session is a signed, HTTP-only cookie that lasts 12 hours, and
+rotating `ADMIN_COOKIE_SECRET` signs everyone out. Five wrong passwords per IP, then one try a
+minute. Logins and failed attempts are written to `events`.
+
 ## Audit rules
 
 - Every user, agent, admin and webhook action is written to `events`, which a trigger
