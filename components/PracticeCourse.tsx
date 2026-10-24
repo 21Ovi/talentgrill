@@ -73,8 +73,9 @@ function CourseView({ course }: { course: Course }) {
                 <p className="text-[15px] leading-snug text-muted">{lesson.why}</p>
                 <p className="font-serif text-[17px] leading-relaxed">{lesson.teach}</p>
                 <div className="flex flex-col gap-1.5 rounded-xl bg-sunken p-3.5">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-faint">Example answer</h3>
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-faint">Sample answer</h3>
                   <p className="font-serif text-[16px] leading-relaxed">{lesson.example}</p>
+                  <p className="text-xs text-faint">Written by {course.trainer} to show the structure. It isn&apos;t your answer.</p>
                 </div>
                 <p className="flex gap-2.5 text-[15px] leading-snug">
                   <Mic className="mt-0.5 size-4 shrink-0 text-ember-text" />
