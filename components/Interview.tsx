@@ -4,6 +4,7 @@ import { Check, Keyboard, Lightbulb, Lock, Mic, RotateCcw, Volume2 } from "lucid
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Brand, Button, Notice, Orb, SegmentedControl, Sheet, SoundToggle } from "@/components/ui";
+import { LiveInterview } from "@/components/LiveInterview";
 import { useCanRecord, VoiceAnswer, type VoiceTake } from "@/components/VoiceAnswer";
 import { api, errorMessage } from "@/lib/clientApi";
 import { cue } from "@/lib/feedback";
@@ -18,6 +19,8 @@ const PASTE_JUMP_CHARS = 80;
 export function Interview({ sessionId }: { sessionId: string }) {
   const [view, setView] = useState<PublicState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Set when the candidate chooses typing over the live call.
+  const [typing, setTyping] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -59,20 +62,34 @@ export function Interview({ sessionId }: { sessionId: string }) {
         )}
         {!view && error && <ErrorPanel message={error} onRetry={load} />}
 
-        {view?.next === "answer" && view.current && (
-          <QuestionStep
-            key={view.current.id}
-            sessionId={sessionId}
-            question={view.current}
-            total={view.progress.total}
-            onSubmitted={load}
-          />
-        )}
+        {view?.next === "answer" &&
+          view.current &&
+          (view.liveInterview && view.current.tier === "free" && !typing ? (
+            <LiveInterview
+              sessionId={sessionId}
+              roleLabel={view.session.roleLabel}
+              questionCount={view.liveQuestions}
+              onDone={load}
+              onTypeInstead={() => setTyping(true)}
+            />
+          ) : (
+            <QuestionStep
+              key={view.current.id}
+              sessionId={sessionId}
+              question={view.current}
+              total={view.progress.total}
+              onSubmitted={load}
+            />
+          ))}
         {view?.next === "quick_eval" && <QuickEvalStep sessionId={sessionId} onDone={load} />}
         {view?.next === "upsell" && view.quickFeedback && (
           <>
             <FeedbackPanel feedback={view.quickFeedback} firstName={view.user.firstName} />
-            <UpsellPanel sessionId={sessionId} pricePaise={view.pricePaise} />
+            {view.paymentsEnabled ? (
+              <UpsellPanel sessionId={sessionId} pricePaise={view.pricePaise} />
+            ) : (
+              <NextRoundPanel />
+            )}
           </>
         )}
         {view?.next === "full_eval" && (
@@ -449,6 +466,23 @@ function UpsellPanel({ sessionId, pricePaise }: { sessionId: string; pricePaise:
       <p className="text-sm text-faint">
         A human reviews your interview before any certificate is issued. Review does not guarantee certification.
       </p>
+    </section>
+  );
+}
+
+// Shown instead of the upsell while payments are on hold.
+function NextRoundPanel() {
+  const router = useRouter();
+  return (
+    <section className="arrive flex flex-col gap-4 pb-10" style={{ "--i": 2 } as React.CSSProperties}>
+      <div className="flex flex-col gap-1">
+        <h2 className="text-[22px] font-semibold tracking-[-0.02em]">Want another round?</h2>
+        <p className="text-[15px] text-muted">Practise again, or try a different role. Every round sharpens your answers.</p>
+      </div>
+      <Button size="lg" variant="secondary" className="w-full" onClick={() => router.push("/")}>
+        <RotateCcw className="size-[18px]" />
+        Start another interview
+      </Button>
     </section>
   );
 }

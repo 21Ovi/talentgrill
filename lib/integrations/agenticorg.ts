@@ -1,4 +1,6 @@
+import { z } from "zod";
 import type { AgentTask } from "../agent/schemas";
+import { env } from "../env";
 import { integrationMode } from "./status";
 
 export type AgentRequest = {
@@ -25,14 +27,73 @@ export function agentClient(): AgentClient {
   return integrationMode("agenticorg") === "stub" ? stubClient : liveClient;
 }
 
+// POST /api/v1/agents/{uuid}/run runs a custom agent synchronously (see
+// docs/vendor/agenticorg.md). FresherCoachAgent reads one `task` input holding
+// our JSON envelope and replies with one JSON object.
+const RunResponse = z.object({
+  run_id: z.string().nullish(),
+  status: z.string(),
+  output: z.unknown(),
+  error: z.unknown().optional(),
+});
+
 const liveClient: AgentClient = {
   mode: "live",
-  async run() {
-    // TODO(VENDOR_DOCS: AgenticOrg TS SDK — how to invoke FresherCoachAgent with a
-    // task + JSON input, and where its JSON output and run ID come back)
-    throw new Error("AgenticOrg live adapter is not wired yet (waiting on docs/vendor/agenticorg.md)");
+  async run({ task, input, previousError, signal }) {
+    const e = env();
+    if (!e.AGENTICORG_API_KEY || !e.AGENTICORG_AGENT_ID) {
+      throw new Error("AGENTICORG_API_KEY / AGENTICORG_AGENT_ID are not set");
+    }
+    const envelope = { task, input, ...(previousError ? { previous_error: previousError } : {}) };
+    const res = await fetch(`${e.AGENTICORG_BASE_URL}/api/v1/agents/${e.AGENTICORG_AGENT_ID}/run`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${e.AGENTICORG_API_KEY}`, "content-type": "application/json" },
+      body: JSON.stringify({ action: "process", inputs: { task: JSON.stringify(envelope) }, context: {} }),
+      signal,
+    });
+    const text = await res.text();
+    if (!res.ok) throw new Error(`AgenticOrg run returned ${res.status}: ${text.slice(0, 300)}`);
+    const run = RunResponse.parse(JSON.parse(text));
+    if (run.status === "hitl_triggered") {
+      throw new Error("AgenticOrg paused the run for human approval; lower the agent's confidence floor");
+    }
+    if (run.status !== "completed") {
+      throw new Error(`AgenticOrg run ${run.status}: ${JSON.stringify(run.error ?? run.output ?? "").slice(0, 300)}`);
+    }
+    return { runId: run.run_id ?? null, output: unwrapOutput(run.output) };
   },
 };
+
+/**
+ * Agents return their reply as a JSON string, an object, or an object wrapping
+ * the reply text (e.g. {"response": "..."}); fences are sometimes added. Return
+ * the reply as parsed JSON when possible so the caller's schema can check it.
+ */
+export function unwrapOutput(output: unknown): unknown {
+  if (typeof output === "string") {
+    const trimmed = output.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      const match = trimmed.match(/\{[\s\S]*\}/);
+      return match ? JSON.parse(match[0]) : trimmed;
+    }
+  }
+  if (output && typeof output === "object" && !Array.isArray(output)) {
+    const values = Object.values(output as Record<string, unknown>);
+    const keys = Object.keys(output as Record<string, unknown>);
+    // A single wrapped reply, e.g. {"result": "{\"hint\": ...}"}.
+    if (keys.length <= 3) {
+      for (const k of ["response", "result", "output", "text", "answer", "content", "message"]) {
+        const v = (output as Record<string, unknown>)[k];
+        if (typeof v === "string" && v.includes("{")) return unwrapOutput(v);
+        if (v && typeof v === "object" && !Array.isArray(v)) return v;
+      }
+    }
+    if (values.length === 1 && typeof values[0] === "string") return unwrapOutput(values[0]);
+  }
+  return output;
+}
 
 // Stub mode: local development only (production needs ALLOW_STUBS=true). Runs are
 // recorded with mode='stub' and excluded from every traction count.

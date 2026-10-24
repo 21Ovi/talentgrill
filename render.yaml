@@ -35,12 +35,18 @@ services:
         value: "false"
       - key: AGENTICORG_MODE
         value: live
+      - key: AGENTICORG_API_KEY
+        sync: false
+      - key: AGENTICORG_AGENT_ID
+        sync: false
       - key: ELEVENLABS_MODE
         value: live
       - key: ELEVENLABS_API_KEY
         sync: false
       - key: ELEVENLABS_VOICE_ID
         sync: false
+      - key: PAYMENTS_ENABLED
+        value: "false"
       - key: PINELABS_MODE
         value: live
       - key: PINELABS_ENV

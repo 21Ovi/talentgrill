@@ -126,6 +126,10 @@ export function publicState(s: LoadedSession) {
     next: s.next,
     quickFeedback: s.quickFeedback,
     pricePaise: env().PRO_PRICE_PAISE,
+    paymentsEnabled: env().PAYMENTS_ENABLED,
+    liveInterview: env().LIVE_INTERVIEW_ENABLED,
+    /** Free questions still open: what a live call would cover. */
+    liveQuestions: s.questions.filter((q) => q.tier === "free" && !q.answered).length,
   };
 }
 

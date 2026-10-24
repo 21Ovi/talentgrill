@@ -23,6 +23,9 @@ export function integrationMode(vendor: Vendor): Mode {
   if (vendor === "elevenlabs" && mode === "live" && !e.ELEVENLABS_API_KEY) {
     throw new Error("elevenlabs is live but ELEVENLABS_API_KEY is not set");
   }
+  if (vendor === "agenticorg" && mode === "live" && (!e.AGENTICORG_API_KEY || !e.AGENTICORG_AGENT_ID)) {
+    throw new Error("agenticorg is live but AGENTICORG_API_KEY / AGENTICORG_AGENT_ID are not set");
+  }
   if (vendor === "pinelabs" && mode === "live" && (!e.PINELABS_CLIENT_ID || !e.PINELABS_CLIENT_SECRET)) {
     throw new Error("pinelabs is live but PINELABS_CLIENT_ID / PINELABS_CLIENT_SECRET are not set");
   }
