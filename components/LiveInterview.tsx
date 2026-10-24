@@ -26,7 +26,7 @@ type Props = {
   beforeStart?: React.ReactNode;
 };
 
-/** A live two-way voice interview with Emma, the ElevenLabs interviewer agent. */
+/** A live two-way voice interview with Anna, the ElevenLabs interviewer agent. */
 export function LiveInterview(props: Props) {
   return (
     <ConversationProvider>
@@ -139,7 +139,7 @@ function LiveCall({ sessionId, roleLabel, questionCount, onDone, onTypeInstead, 
       <section className="arrive flex flex-col items-start gap-6 pt-2">
         <Orb state="idle" className="size-20" />
         <div className="flex flex-col gap-2">
-          <h2 className="font-serif text-[30px] leading-tight">Meet Emma, your interviewer.</h2>
+          <h2 className="font-serif text-[30px] leading-tight">Meet Anna, your interviewer.</h2>
           <p className="text-[17px] leading-relaxed text-muted">
             A live voice conversation, about five minutes. She&apos;ll start with a quick hello, then ask you{" "}
             {questionCount} {questionCount === 1 ? "question" : "questions"} for the {roleLabel} role.
@@ -168,7 +168,7 @@ function LiveCall({ sessionId, roleLabel, questionCount, onDone, onTypeInstead, 
         <Orb state="thinking" className="size-24" />
         <div className="flex flex-col gap-1">
           <h2 className="font-serif text-[26px] leading-tight">
-            {phase === "connecting" ? "Connecting you to Emma…" : "Saving your interview…"}
+            {phase === "connecting" ? "Connecting you to Anna…" : "Saving your interview…"}
           </h2>
           <p className="text-[15px] text-muted">
             {phase === "connecting"
@@ -188,7 +188,7 @@ function LiveCall({ sessionId, roleLabel, questionCount, onDone, onTypeInstead, 
       </span>
       <Orb ref={orb} state="listening" className="size-40" />
       <p className="text-[15px] font-medium text-ember-text" aria-live="polite">
-        {conversation.isSpeaking ? "Emma is speaking" : muted ? "You're muted" : "Listening…"}
+        {conversation.isSpeaking ? "Anna is speaking" : muted ? "You're muted" : "Listening…"}
       </p>
       <p className="min-h-[4.5rem] max-w-md font-serif text-[19px] leading-relaxed">
         {caption ? (caption.role === "user" ? <span className="text-muted">“{caption.text}”</span> : caption.text) : " "}
