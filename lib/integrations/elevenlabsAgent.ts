@@ -62,15 +62,58 @@ async function call<T>(path: string, init: { method: string; body?: unknown }, s
 
 const g = globalThis as unknown as { __interviewerAgent?: Promise<string> };
 
-/** The interviewer agent's id: pinned by env, else found by name or created once. */
+/**
+ * The interviewer agent's id: pinned by env, else found by name or created once.
+ * Its greeting and prompt are brought in line with the code on first use.
+ */
 export function interviewerAgentId(): Promise<string> {
   const pinned = env().ELEVENLABS_AGENT_ID;
-  if (pinned) return Promise.resolve(pinned);
-  g.__interviewerAgent ??= ensureAgent().catch((err) => {
-    g.__interviewerAgent = undefined;
-    throw err;
-  });
+  g.__interviewerAgent ??= (pinned ? Promise.resolve(pinned) : ensureAgent())
+    .then(async (id) => {
+      await syncInterviewer(id);
+      return id;
+    })
+    .catch((err) => {
+      g.__interviewerAgent = undefined;
+      throw err;
+    });
   return g.__interviewerAgent;
+}
+
+const AgentConfig = z.object({
+  conversation_config: z.object({
+    agent: z.object({ first_message: z.string(), prompt: z.object({ prompt: z.string() }).loose() }).loose(),
+  }),
+});
+
+/**
+ * Updates the agent's greeting and prompt when they differ from the code (e.g.
+ * after renaming the interviewer). Keeps its model, tools and voice. A failure is
+ * recorded but doesn't block calls: the agent keeps its current wording.
+ */
+async function syncInterviewer(agentId: string): Promise<void> {
+  try {
+    const current = await call(`/agents/${agentId}`, { method: "GET" }, AgentConfig);
+    const agent = current.conversation_config.agent;
+    if (agent.first_message === FIRST_MESSAGE && agent.prompt.prompt === INTERVIEWER_PROMPT) return;
+    // The GET returns tools both expanded ("tools") and by id; a PATCH may carry only one.
+    const prompt = Object.fromEntries(Object.entries(agent.prompt).filter(([k]) => k !== "tools"));
+    await call(
+      `/agents/${agentId}`,
+      {
+        method: "PATCH",
+        body: {
+          conversation_config: {
+            agent: { first_message: FIRST_MESSAGE, prompt: { ...prompt, prompt: INTERVIEWER_PROMPT } },
+          },
+        },
+      },
+      z.object({ agent_id: z.string() }).loose(),
+    );
+  } catch (err) {
+    recordError("elevenlabs", err);
+    console.error("[interviewer] couldn't sync the agent's prompt", err);
+  }
 }
 
 async function ensureAgent(): Promise<string> {

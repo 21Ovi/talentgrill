@@ -50,7 +50,7 @@ export const RESUME_INSTRUCTIONS =
 export const RESUME_CONTEXT_NOTE =
   "Optional context from the candidate's resume. Use it to judge consistency between their answers and their resume, to judge role fit, and to make advice specific to their projects. Never penalise a short or missing resume, and judge only what they actually said in the interview.";
 
-/** A compact summary of the profile for other agents' inputs and Emma's prompt. */
+/** A compact summary of the profile for other agents' inputs and Anna's prompt. */
 export function resumeBrief(p: ResumeProfile): string {
   const lines = [p.headline];
   if (p.education.length) lines.push(`Education: ${p.education.map((e) => [e.degree, e.institution, e.year].filter(Boolean).join(", ")).join("; ")}`);

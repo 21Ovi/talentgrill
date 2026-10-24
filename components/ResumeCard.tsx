@@ -13,7 +13,7 @@ type Resume = NonNullable<PublicState["resume"]>;
 export function ResumeCard(props: {
   sessionId: string;
   initial: Resume | null;
-  /** Emma opens with a question written from the resume. */
+  /** Anna opens with a question written from the resume. */
   hasQuestion: boolean;
   /** Reloads the session so the question count includes the resume question. */
   onUploaded: () => Promise<void>;
@@ -74,10 +74,10 @@ export function ResumeCard(props: {
         )}
         <p className="text-sm text-muted">
           {hasQuestion
-            ? "Emma will open with one question about your resume, then the role questions. It's scored like the others."
+            ? "Anna will open with one question about your resume, then the role questions. It's scored like the others."
             : resume.talking_points[0]
-              ? `Emma may ask about: ${resume.talking_points[0]}`
-              : "Emma will use it to personalise the interview."}
+              ? `Anna may ask about: ${resume.talking_points[0]}`
+              : "Anna will use it to personalise the interview."}
         </p>
         {error && <Notice>{error}</Notice>}
         <button
@@ -100,7 +100,7 @@ export function ResumeCard(props: {
         <div className="flex flex-col gap-1">
           <p className="text-[16px] font-semibold">Add your resume (optional)</p>
           <p className="text-sm leading-snug text-muted">
-            Emma will ask about your own projects, and your feedback and course will take it into account. PDF or .txt,
+            Anna will ask about your own projects, and your feedback and course will take it into account. PDF or .txt,
             up to 2 MB. We keep a short summary, never the file or your contact details.
           </p>
         </div>

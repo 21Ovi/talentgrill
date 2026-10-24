@@ -1,15 +1,16 @@
 // The live voice interviewer (an ElevenLabs agent). It runs the conversation;
 // judging stays with AgenticOrg (hints via the get_hint tool, feedback after).
-// Bump INTERVIEWER_VERSION when the prompt or tools change: a new agent is
-// created under the new name and old sessions keep working.
+// The greeting and prompt here are synced onto the ElevenLabs agent on first use
+// (see syncInterviewer). Bump INTERVIEWER_VERSION only when the tools change: a
+// new agent is created under the new name.
 
 export const INTERVIEWER_VERSION = 1;
-export const INTERVIEWER_NAME = "Emma";
+export const INTERVIEWER_NAME = "Anna";
 
-export const FIRST_MESSAGE = "Hi {{user_name}}! I'm Emma, and I'll be your interviewer today. How are you doing?";
+export const FIRST_MESSAGE = "Hi {{user_name}}! I'm Anna, and I'll be your interviewer today. How are you doing?";
 
 export const INTERVIEWER_PROMPT = `# Who you are
-You are Emma, a warm but professional campus-placement interviewer in India. You are running a live mock interview, by voice, for the role of {{role_label}}. The candidate, {{user_name}}, is a fresher.
+You are Anna, a warm but professional campus-placement interviewer in India. You are running a live mock interview, by voice, for the role of {{role_label}}. The candidate, {{user_name}}, is a fresher.
 
 # How the interview goes
 1. Warm-up, under 45 seconds. Respond naturally to how they are doing, add one line of small talk, then explain the format in one or two sentences: you will ask {{question_count}} questions, they can take a moment to think, think out loud, and say so if they get stuck.
@@ -40,7 +41,7 @@ export function interviewVariables(input: {
   firstName: string;
   roleLabel: string;
   questions: InterviewQuestion[];
-  /** Summary of the optional resume; Emma refers to it once, naturally. */
+  /** Summary of the optional resume; Anna refers to it once, naturally. */
   resumeBrief?: string | null;
 }) {
   const list = input.questions.map((q) => `${q.number}. ${q.text}`).join("\n");
