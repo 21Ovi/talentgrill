@@ -20,7 +20,7 @@ export type SessionQuestion = {
 
 export type Next = "answer" | "quick_eval" | "upsell" | "full_eval";
 
-export type Course = CoursePlanOutput & { trainer: string };
+export type Course = CoursePlanOutput & { trainer: string; completed: number[] };
 
 export type LoadedSession = {
   id: string;
@@ -76,10 +76,15 @@ export async function loadSession(id: string, db: Queryable = pool()): Promise<L
   const quickFeedback = parsedFeedback.success ? parsedFeedback.data : null;
 
   const [courseRow] = (
-    await db.query<{ trainer: string; plan: unknown }>("select trainer, plan from courses where session_id = $1", [id])
+    await db.query<{ trainer: string; plan: unknown; completed_lessons: number[] }>(
+      "select trainer, plan, completed_lessons from courses where session_id = $1",
+      [id],
+    )
   ).rows;
   const parsedCourse = courseRow ? CoursePlanOutput.safeParse(courseRow.plan) : null;
-  const course = parsedCourse?.success ? { ...parsedCourse.data, trainer: courseRow.trainer } : null;
+  const course = parsedCourse?.success
+    ? { ...parsedCourse.data, trainer: courseRow.trainer, completed: courseRow.completed_lessons }
+    : null;
 
   const nextFree = questions.find((q) => q.tier === "free" && !q.answered) ?? null;
   const nextPro = questions.find((q) => q.tier === "pro" && !q.answered) ?? null;
