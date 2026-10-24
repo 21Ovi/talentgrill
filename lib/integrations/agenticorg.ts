@@ -16,6 +16,10 @@ export type AgentResponse = {
   runId: string | null;
   /** Parsed JSON or raw text; the caller validates it. */
   output: unknown;
+  /** The agent's self-reported confidence, when AgenticOrg gives one. */
+  confidence?: number | null;
+  /** Why AgenticOrg held the run for human approval, if it did. */
+  heldForApproval?: string | null;
 };
 
 export interface AgentClient {
@@ -34,8 +38,15 @@ const RunResponse = z.object({
   run_id: z.string().nullish(),
   status: z.string(),
   output: z.unknown(),
+  confidence: z.number().nullish(),
+  hitl_trigger: z.string().nullish(),
   error: z.unknown().optional(),
 });
+
+// A held run still carries the agent's full reply. Hints and practice feedback
+// are advisory, so they use it and the hold stays in AgenticOrg's approval queue;
+// the certificate decision (full_eval) waits for a human.
+const ADVISORY_TASKS: ReadonlySet<AgentTask> = new Set(["hint", "quick_eval", "followup"]);
 
 const liveClient: AgentClient = {
   mode: "live",
@@ -54,13 +65,19 @@ const liveClient: AgentClient = {
     const text = await res.text();
     if (!res.ok) throw new Error(`AgenticOrg run returned ${res.status}: ${text.slice(0, 300)}`);
     const run = RunResponse.parse(JSON.parse(text));
-    if (run.status === "hitl_triggered") {
-      throw new Error("AgenticOrg paused the run for human approval; lower the agent's confidence floor");
+    const held = run.status === "hitl_triggered";
+    if (held && (run.output == null || !ADVISORY_TASKS.has(task))) {
+      throw new Error(`AgenticOrg held the run for human approval (${run.hitl_trigger ?? "no reason given"})`);
     }
-    if (run.status !== "completed") {
+    if (run.status !== "completed" && !held) {
       throw new Error(`AgenticOrg run ${run.status}: ${JSON.stringify(run.error ?? run.output ?? "").slice(0, 300)}`);
     }
-    return { runId: run.run_id ?? null, output: unwrapOutput(run.output) };
+    return {
+      runId: run.run_id ?? null,
+      output: unwrapOutput(run.output),
+      confidence: run.confidence ?? null,
+      heldForApproval: held ? (run.hitl_trigger ?? "held for approval") : null,
+    };
   },
 };
 
