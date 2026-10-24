@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# End-to-end check: health, signup, hint, two answers, quick feedback, course, payment
+# End-to-end check: health, signup, login, resume, hint, two answers, quick feedback, course, test, payment
 # and webhook rejection. Run against a local server with the agent in stub mode; never
 # against production (it creates a user).
 set -euo pipefail
@@ -17,6 +17,11 @@ SID=$(curl -sf -X POST "$BASE/api/signup" -H "$J" \
 [ "$(curl -sf -X POST "$BASE/api/login" -H "$J" -d '{"phone":"9000000099","password":"ci-smoke-pass"}' | field sessionId)" = "$SID" ] || { echo "login did not return the latest session"; exit 1; }
 CODE=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/api/login" -H "$J" -d '{"phone":"9000000099","password":"wrong-password"}')
 [ "$CODE" = "401" ] || { echo "expected wrong password to get 401, got $CODE"; exit 1; }
+
+# Optional resume before the interview (stub agent reads it).
+RESUME=$(mktemp)
+echo "B.Tech Computer Science student. Projects: a class attendance app built with Node.js and React. Skills: Java, SQL, Git. Internship: web developer intern at a startup, built REST APIs and fixed bugs in the admin dashboard." > "$RESUME"
+curl -sf -X POST "$BASE/api/sessions/$SID/resume" -F "file=@$RESUME;type=text/plain" | field resume.headline > /dev/null
 
 for n in 1 2; do
   Q=$(curl -sf "$BASE/api/sessions/$SID" | field current.id)

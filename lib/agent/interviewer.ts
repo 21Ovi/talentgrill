@@ -40,7 +40,14 @@ export function interviewVariables(input: {
   firstName: string;
   roleLabel: string;
   questions: InterviewQuestion[];
+  /** Summary of the optional resume; Emma refers to it once, naturally. */
+  resumeBrief?: string | null;
 }) {
+  const list = input.questions.map((q) => `${q.number}. ${q.text}`).join("\n");
+  // Sent inside {{questions}} so the existing ElevenLabs agent needs no change.
+  const background = input.resumeBrief
+    ? `Candidate background, from the resume they shared (for you only; never read it out):\n${input.resumeBrief}\nAfter they introduce themselves, mention one specific project or experience from it in one friendly sentence. During the questions you may use it for at most one follow-up. Never quote contact details or anything not listed here.\n\nQuestions:\n`
+    : "";
   return {
     // Not used by the prompt: echoed back in the transcript so the server can
     // check that a finished call belongs to this session.
@@ -48,6 +55,6 @@ export function interviewVariables(input: {
     user_name: input.firstName,
     role_label: input.roleLabel,
     question_count: String(input.questions.length),
-    questions: input.questions.map((q) => `${q.number}. ${q.text}`).join("\n"),
+    questions: background + list,
   };
 }

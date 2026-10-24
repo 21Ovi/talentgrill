@@ -5,6 +5,7 @@ import { query } from "@/lib/db";
 import { logEvent, requestMeta } from "@/lib/events";
 import { handle, HttpError, isUuid, json, notFound } from "@/lib/http";
 import { clientIp, take } from "@/lib/rateLimit";
+import { RESUME_CONTEXT_NOTE, resumeBrief } from "@/lib/resume";
 import { loadSession, publicCourse } from "@/lib/session";
 
 // Double taps share one agent run per session, like quick feedback.
@@ -64,6 +65,7 @@ async function buildCourse(req: Request, id: string): Promise<Response> {
       role: s.roleLabel,
       trainer: COURSE_TRAINER,
       course_format: COURSE_FORMAT,
+      ...(s.resume ? { resume: resumeBrief(s.resume), resume_note: RESUME_CONTEXT_NOTE } : {}),
       overall_estimate: s.quickFeedback.overall_estimate,
       strength: s.quickFeedback.strength,
       fixes: s.quickFeedback.fixes,

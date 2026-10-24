@@ -5,6 +5,7 @@ import { logError, logEvent, requestMeta } from "@/lib/events";
 import { handle, HttpError, isUuid, json, notFound } from "@/lib/http";
 import { conversationToken, interviewerAgentId } from "@/lib/integrations/elevenlabsAgent";
 import { clientIp, take } from "@/lib/rateLimit";
+import { resumeBrief } from "@/lib/resume";
 import { loadSession } from "@/lib/session";
 
 // Starts a live voice interview: the remaining free questions, asked by the
@@ -61,6 +62,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/sessions/[id]/l
           firstName: s.firstName,
           roleLabel: s.roleLabel,
           questions: questions.map(({ number, text }) => ({ number, text })),
+          resumeBrief: s.resume ? resumeBrief(s.resume) : null,
         }),
       });
     },

@@ -1,4 +1,4 @@
-import { CoursePlanOutput, QuickEvalOutput } from "./agent/schemas";
+import { CoursePlanOutput, QuickEvalOutput, ResumeProfile } from "./agent/schemas";
 import { coursesEnabled, PASS_PERCENT } from "./course";
 import { pool, type Queryable } from "./db";
 import { env } from "./env";
@@ -36,6 +36,8 @@ export type LoadedSession = {
   quickFeedback: QuickEvalOutput | null;
   /** The practice course written from the quick feedback, once requested. */
   course: Course | null;
+  /** Profile read from the optional resume, if one was uploaded. */
+  resume: ResumeProfile | null;
   /** Company-specific guides, unlocked at 80+ on the final test or the interview. */
   companyPreps: CompanyPrep[];
   /** Free questions, plus pro questions once the session is Pro. */
@@ -85,6 +87,10 @@ export async function loadSession(id: string, db: Queryable = pool()): Promise<L
       [id],
     )
   ).rows;
+  const [resumeRow] = (await db.query<{ profile: unknown }>("select profile from resumes where session_id = $1", [id])).rows;
+  const parsedResume = resumeRow ? ResumeProfile.safeParse(resumeRow.profile) : null;
+  const resume = parsedResume?.success ? parsedResume.data : null;
+
   const companyPreps = (
     await db.query<{ company: string; plan: unknown }>(
       "select company, plan from company_preps where session_id = $1 order by created_at",
@@ -138,6 +144,7 @@ export async function loadSession(id: string, db: Queryable = pool()): Promise<L
     quickFeedback,
     course,
     companyPreps,
+    resume,
     questions,
     current,
     currentHints,
@@ -165,6 +172,7 @@ export function publicState(s: LoadedSession) {
     course: s.course && publicCourse(s.course),
     coursesEnabled: coursesEnabled(),
     companyPreps: s.companyPreps,
+    resume: s.resume,
     companyPrepUnlocked: companyPrepUnlocked(s),
     pricePaise: env().PRO_PRICE_PAISE,
     paymentsEnabled: env().PAYMENTS_ENABLED,

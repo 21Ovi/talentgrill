@@ -6,6 +6,7 @@ import { query } from "@/lib/db";
 import { logEvent, requestMeta } from "@/lib/events";
 import { handle, HttpError, isUuid, json, notFound, readJson } from "@/lib/http";
 import { clientIp, take } from "@/lib/rateLimit";
+import { RESUME_CONTEXT_NOTE, resumeBrief } from "@/lib/resume";
 import { companyPrepUnlocked, loadSession } from "@/lib/session";
 
 const Body = z.object({ company: z.enum(COMPANIES, { error: "Pick a company from the list." }) });
@@ -67,6 +68,7 @@ async function buildPrep(req: Request, id: string, company: (typeof COMPANIES)[n
       test_score: s.course?.testScore ?? null,
       strength: s.quickFeedback?.strength ?? null,
       fixes: s.quickFeedback?.fixes ?? [],
+      ...(s.resume ? { resume: resumeBrief(s.resume), resume_note: RESUME_CONTEXT_NOTE } : {}),
       instructions: companyPrepInstructions(company),
     },
   });

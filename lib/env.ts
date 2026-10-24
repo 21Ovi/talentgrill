@@ -27,6 +27,8 @@ const schema = z.object({
   AGENTICORG_AGENT_ID: z.guid().optional(),
   // UUID of CourseCreatorAgent ("Matt"); practice courses are hidden while unset.
   AGENTICORG_COURSE_AGENT_ID: z.guid().optional(),
+  // UUID of ResumeReaderAgent; FresherCoachAgent reads resumes while unset.
+  AGENTICORG_RESUME_AGENT_ID: z.guid().optional(),
   ELEVENLABS_MODE: mode,
   ELEVENLABS_API_KEY: z.string().min(1).optional(),
   // ElevenLabs premade voice "Rachel"; swap for an Indian-English voice from the library.

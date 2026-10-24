@@ -7,6 +7,7 @@ import { Brand, Button, Notice, Orb, SegmentedControl, Sheet, SoundToggle } from
 import { LiveInterview } from "@/components/LiveInterview";
 import { CompanyPrep } from "@/components/CompanyPrep";
 import { PracticeCourse } from "@/components/PracticeCourse";
+import { ResumeCard } from "@/components/ResumeCard";
 import { useCanRecord, VoiceAnswer, type VoiceTake } from "@/components/VoiceAnswer";
 import { api, errorMessage } from "@/lib/clientApi";
 import { cue } from "@/lib/feedback";
@@ -73,15 +74,21 @@ export function Interview({ sessionId }: { sessionId: string }) {
               questionCount={view.liveQuestions}
               onDone={load}
               onTypeInstead={() => setTyping(true)}
+              beforeStart={
+                view.progress.answered === 0 && <ResumeCard sessionId={sessionId} initial={view.resume} />
+              }
             />
           ) : (
-            <QuestionStep
-              key={view.current.id}
-              sessionId={sessionId}
-              question={view.current}
-              total={view.progress.total}
-              onSubmitted={load}
-            />
+            <>
+              {view.progress.answered === 0 && <ResumeCard sessionId={sessionId} initial={view.resume} />}
+              <QuestionStep
+                key={view.current.id}
+                sessionId={sessionId}
+                question={view.current}
+                total={view.progress.total}
+                onSubmitted={load}
+              />
+            </>
           ))}
         {view?.next === "quick_eval" && <QuickEvalStep sessionId={sessionId} onDone={load} />}
         {view?.next === "upsell" && view.quickFeedback && (
