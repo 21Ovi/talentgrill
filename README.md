@@ -30,10 +30,15 @@ npm run dev
 | `npm run db:seed` | Upserts the question bank (the only seed data allowed) |
 | `npm run check` | Typecheck and lint |
 
-## Deploy
+## CI/CD
 
-`render.yaml` is a Render Blueprint: it creates the web service and Postgres, generates
-secrets, and runs migrations and the seed before each deploy. Pushes to `main` deploy.
+- **CI** (`.github/workflows/ci.yml`) runs on every pull request and every push to `main`:
+  typecheck, lint, migrations and seed run twice against Postgres 18, an append-only check
+  on `events`, a production build, and `scripts/smoke.sh` (signup → hint → answers →
+  quick feedback, with the agent in stub mode).
+- **CD**: `render.yaml` is a Render Blueprint (web service + Postgres in Singapore,
+  generated secrets, migrations and seed before each deploy). With
+  `autoDeployTrigger: checksPass`, every push to `main` deploys once CI passes.
 
 ## Audit rules
 

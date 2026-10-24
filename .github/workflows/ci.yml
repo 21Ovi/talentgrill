@@ -1,0 +1,59 @@
+name: CI
+
+# Runs on every pull request and every push to main. Render deploys main only
+# after this passes (autoDeployTrigger: checksPass in render.yaml).
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Typecheck, lint, migrate, build, smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: talentgrill
+          POSTGRES_PASSWORD: talentgrill
+          POSTGRES_DB: talentgrill_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U talentgrill"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://talentgrill:talentgrill@localhost:5432/talentgrill_ci
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+
+      - name: Migrate and seed twice (both must be idempotent)
+        run: npm run db:migrate && npm run db:seed && npm run db:migrate && npm run db:seed
+
+      - name: Audit log rejects UPDATE, DELETE and TRUNCATE
+        run: |
+          for sql in "update events set type = 'x'" "delete from events" "truncate events"; do
+            if psql "$DATABASE_URL" -c "$sql" 2>/dev/null; then echo "events accepted: $sql"; exit 1; fi
+          done
+
+      - run: npm run build
+
+      - name: Smoke test the free interview flow (agent in stub mode)
+        env:
+          AGENTICORG_MODE: stub
+          ALLOW_STUBS: "true"
+        run: |
+          npx next start -p 3000 &
+          bash scripts/smoke.sh http://localhost:3000
